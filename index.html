@@ -52,6 +52,20 @@
   .pin.fill .dot,.pin.fill .lbl{background:var(--fill)}
   .pin.ok .dot,.pin.ok .lbl{background:var(--ok)}
   .pin.sel .dot{outline:3px solid var(--accent);outline-offset:2px}
+  .pin.ctl .dot{width:22px;height:22px;border-radius:50%;background:transparent;border:3px solid #a855f7;box-shadow:none;
+    background-image:linear-gradient(#a855f7,#a855f7),linear-gradient(#a855f7,#a855f7);background-size:3px 100%,100% 3px;background-position:center;background-repeat:no-repeat}
+  .pin.ctl .lbl{background:#6b21a8}
+  .pin.ctl.set .lbl{background:#7e22ce}
+  #gpsAcc{position:absolute;border-radius:50%;background:rgba(37,99,235,.15);border:2px solid rgba(37,99,235,.6);transform:translate(-50%,-50%);pointer-events:none;display:none}
+  #gpsDot{position:absolute;width:20px;height:20px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 2px rgba(37,99,235,.4),0 1px 6px rgba(0,0,0,.5);
+    transform:translate(-50%,-50%) scale(var(--inv,1));pointer-events:none;display:none}
+  .fab.gps-on{background:#2563eb}
+  .fab.gps-follow{background:#2563eb;box-shadow:0 0 0 3px #93c5fd}
+  .fab.wide{width:auto;padding:0 12px;font-size:14px;font-weight:700}
+  .resid{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:14px;margin-top:8px}
+  .resid b{text-align:right;font-variant-numeric:tabular-nums}
+  .switch{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:15px}
+  .switch input{width:24px;height:24px}
   .plan-tools{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;align-items:flex-start;pointer-events:none}
   .seg{display:flex;background:rgba(17,24,31,.88);border-radius:12px;padding:3px;pointer-events:auto;box-shadow:0 2px 8px rgba(0,0,0,.3)}
   .seg button{background:none;border:0;color:var(--muted);font-weight:700;font-size:14px;padding:8px 12px;border-radius:9px}
@@ -122,16 +136,19 @@
 <main>
   <!-- PLAN -->
   <section class="view active" id="planView">
-    <div id="stage"><img id="planImg" alt="Site plan"><div id="pins"></div></div>
+    <div id="stage"><img id="planImg" alt="Site plan"><div id="pins"></div><div id="gpsAcc"></div><div id="gpsDot"></div></div>
     <div class="plan-tools">
       <div class="seg" id="modeSeg">
         <button data-mode="shoot" class="on">Shoot</button>
         <button data-mode="point">+ Point</button>
+        <button data-mode="cal">📍 Cal</button>
       </div>
       <div class="fab-col">
         <button class="fab" id="zoomIn" aria-label="Zoom in">+</button>
         <button class="fab" id="zoomOut" aria-label="Zoom out">−</button>
         <button class="fab" id="zoomFit" aria-label="Fit plan">⤢</button>
+        <button class="fab" id="gpsBtn" aria-label="GPS location">📍</button>
+        <button class="fab wide" id="shotHere" style="display:none">Shot here</button>
       </div>
     </div>
     <div class="warn-banner" id="noHiBanner" style="display:none">
@@ -172,6 +189,15 @@
         <input id="chkRod" type="text" inputmode="decimal" placeholder="4.50">
         <div class="result" id="chkResult" style="display:none"><div class="rv" id="chkVal"></div><div class="rs" id="chkMsg"></div></div>
         <button class="btn ghost" id="chkBtn">Check</button>
+      </div>
+
+      <div class="card">
+        <h2>GPS on the plan</h2>
+        <div class="muted">Lines the plan up with the phone's GPS using control points (purple crosshairs). Defaults are the 4 building corners – move, rename, add or delete them on the Plan tab in <b>📍 Cal</b> mode. Stand on each one and tap <b>Capture GPS here</b>.</div>
+        <div id="geoStatus" class="resid"></div>
+        <label class="switch"><input type="checkbox" id="useScale"> Lock to plan scale (recommended)</label>
+        <div class="note">Uses the plan's 1"=30' scale so only position and rotation come from GPS. Turn off only if the plan image isn't to scale.</div>
+        <button class="btn ghost sm" id="resetCtl">Reset control points to defaults</button>
       </div>
 
       <div class="card">
@@ -261,10 +287,33 @@
   <button class="btn danger sm" id="shDelete" style="display:none">Delete</button>
 </div>
 
+<div class="sheet" id="ctlSheet">
+  <div class="grab"></div>
+  <h3>Control point</h3>
+  <div class="muted">Stand exactly on this spot and capture GPS. Hold the phone still at chest height.</div>
+  <label>Name</label>
+  <input id="cpName" type="text" placeholder="e.g. Bldg NW corner">
+  <div class="row">
+    <div><label>Latitude</label><input id="cpLat" type="text" inputmode="decimal" placeholder="33.7..."></div>
+    <div><label>Longitude</label><input id="cpLon" type="text" inputmode="decimal" placeholder="-84.7..."></div>
+  </div>
+  <div class="result" id="cpCapBox" style="display:none"><div class="rv" id="cpCapVal" style="font-size:28px"></div><div class="rs" id="cpCapMsg"></div></div>
+  <button class="btn" id="cpCapture">Capture GPS here (20 sec)</button>
+  <div class="row">
+    <button class="btn ghost sm" id="cpMove">Move on plan</button>
+    <button class="btn ghost sm" id="cpClearGps">Clear GPS</button>
+  </div>
+  <div class="row">
+    <button class="btn ghost" id="cpCancel">Close</button>
+    <button class="btn" id="cpSave">Save</button>
+  </div>
+  <button class="btn danger sm" id="cpDelete">Delete point</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = '1.0.0';
+const VERSION = '1.2.0';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
@@ -282,6 +331,8 @@ const defaults = p => ({
   prefix: p.elevPrefix ?? 0,
   presets: [0, 4, 6, 8, 12],
   points: (p.points || []).map(x => ({...x})),
+  geo: (p.control || []).map(x => ({...x})),
+  useScale: !!p.planFtPerPx,
   shots: [],
   nextShot: 1
 });
@@ -384,10 +435,10 @@ planView.addEventListener('pointermove', e => {
     const p = pinchState();
     view.x += p.cx - gesture.pinch.cx; view.y += p.cy - gesture.pinch.cy;
     zoomAt(p.cx - r.left, p.cy - r.top, p.d / gesture.pinch.d);
-    gesture.pinch = p;
+    gesture.pinch = p; stopFollow();
   } else if (ptrs.size === 1) {
     if (Math.hypot(e.clientX - gesture.sx, e.clientY - gesture.sy) > 8) gesture.tap = false;
-    if (!gesture.tap) { view.x += e.clientX - gesture.lx; view.y += e.clientY - gesture.ly; apply(); }
+    if (!gesture.tap) { view.x += e.clientX - gesture.lx; view.y += e.clientY - gesture.ly; apply(); stopFollow(); }
     gesture.lx = e.clientX; gesture.ly = e.clientY;
   }
 });
@@ -408,12 +459,15 @@ let mode = 'shoot';
 $$('#modeSeg button').forEach(b => b.onclick = () => {
   mode = b.dataset.mode;
   $$('#modeSeg button').forEach(x => x.classList.toggle('on', x === b));
-  updateHint();
+  pendingMove = null; renderPins(); updateHint();
 });
 function updateHint(){
-  $('#hint').textContent = mode === 'shoot'
-    ? (S.points.length ? 'Tap an orange point, or tap where you are standing' : 'Tap where you are standing to take a shot')
-    : 'Tap the plan to add a target point';
+  if (pendingMove) { $('#hint').textContent = `Tap the new spot for "${pendingMove.name || 'control point'}"`; return; }
+  const near = gps.on && gps.plan ? nearestTarget() : null;
+  $('#hint').textContent = mode === 'cal' ? 'Tap a purple crosshair to capture GPS, or tap the plan to add one'
+    : mode === 'point' ? 'Tap the plan to add a target point'
+    : near ? `Nearest: ${near.p.name || 'point'} · ${Math.round(near.ft)} ft`
+    : (S.points.length ? 'Tap an orange point, or tap where you are standing' : 'Tap where you are standing to take a shot');
   $('#noHiBanner').style.display = (mode === 'shoot' && !isFinite(HI())) ? 'block' : 'none';
 }
 
@@ -423,6 +477,17 @@ function onTap(cx, cy){
   const px = (cx - r.left - view.x) / view.s, py = (cy - r.top - view.y) / view.s;
   // hit-test pins within 24 screen px (targets first)
   const near = (o) => Math.hypot((o.x - px) * view.s, (o.y - py) * view.s) < 24;
+  if (pendingMove) {
+    pendingMove.x = Math.round(px); pendingMove.y = Math.round(py);
+    const cp = pendingMove; pendingMove = null; save(); geoFit(); renderPins(); updateHint(); openCtl(cp); return;
+  }
+  if (mode === 'cal') {
+    const cp = S.geo.find(near);
+    if (cp) return openCtl(cp);
+    if (px < 0 || py < 0 || px > img.naturalWidth || py > img.naturalHeight) return;
+    const n = { id: 'c' + Date.now(), name: 'Control ' + (S.geo.length + 1), x: Math.round(px), y: Math.round(py), lat: null, lon: null };
+    S.geo.push(n); save(); renderPins(); return openCtl(n);
+  }
   const tgt = S.points.find(near);
   const shot = [...S.shots].reverse().find(near);
   if (mode === 'point') {
@@ -438,6 +503,10 @@ function onTap(cx, cy){
 /* ---------- pins ---------- */
 function renderPins(){
   const html = [];
+  if (mode === 'cal' || pendingMove) for (const c of S.geo) {
+    const ok = isNum(c.lat) && isNum(c.lon);
+    html.push(`<div class="pin ctl ${ok ? 'set' : ''}" style="left:${c.x}px;top:${c.y}px"><div class="dot"></div><div class="lbl">${esc(c.name.replace(/^Bldg /, ''))} ${ok ? '✓' : '○'}</div></div>`);
+  }
   for (const p of S.points) {
     html.push(`<div class="pin target" style="left:${p.x}px;top:${p.y}px"><div class="dot"></div><div class="lbl">${esc(p.name || 'Pt')} · ${f2(p.elev)}${p.offset ? ' −' + p.offset + '"' : ''}</div></div>`);
   }
@@ -569,6 +638,8 @@ function renderSetup(){
   $('#presets').value = S.presets.join(', ');
   $('#ptCount').textContent = `${S.points.length} target point${S.points.length === 1 ? '' : 's'} on this project.`;
   $('#chkResult').style.display = 'none'; $('#chkRod').value = '';
+  $('#useScale').checked = !!S.useScale; $('#useScale').disabled = !proj.planFtPerPx;
+  renderGeoStatus();
   setupCalc();
 }
 function setupCalc(){
@@ -687,6 +758,214 @@ $('#clearLog').onclick = function(){
   } else { this.dataset.armed = Date.now(); this.textContent = 'Tap again to clear all shots'; setTimeout(() => { this.textContent = 'Clear all shots'; }, 3000); }
 };
 
+
+/* ---------- GPS on the plan (v1.2) ---------- */
+let pendingMove = null;
+const gps = { on: false, follow: false, watch: null, fix: null, plan: null, fit: null };
+const M_PER_FT = 0.3048;
+
+// local flat-earth meters around a reference lat/lon (fine over a few hundred feet)
+function toLocal(lat, lon, ref){
+  const k = Math.cos(ref.lat * Math.PI / 180);
+  return { e: (lon - ref.lon) * 111320 * k, n: (lat - ref.lat) * 110574 };
+}
+// similarity fit: plan (x, -y) as complex = s * (e + i n) + t ; least squares
+function geoFit(){
+  gps.fit = null;
+  const pts = S.geo.filter(c => isNum(c.lat) && isNum(c.lon));
+  if (pts.length < 2) { updateGpsDot(); return null; }
+  const ref = { lat: pts.reduce((a, c) => a + c.lat, 0) / pts.length, lon: pts.reduce((a, c) => a + c.lon, 0) / pts.length };
+  const G = pts.map(c => toLocal(c.lat, c.lon, ref)), P = pts.map(c => ({ x: c.x, y: -c.y }));
+  const mg = { e: avg(G.map(g => g.e)), n: avg(G.map(g => g.n)) }, mp = { x: avg(P.map(q => q.x)), y: avg(P.map(q => q.y)) };
+  let re = 0, im = 0, den = 0;
+  for (let i = 0; i < G.length; i++) {
+    const ge = G[i].e - mg.e, gn = G[i].n - mg.n, px = P[i].x - mp.x, py = P[i].y - mp.y;
+    re += px * ge + py * gn; im += py * ge - px * gn; den += ge * ge + gn * gn;
+  }
+  if (den < 1) return null; // points on top of each other
+  let sr = re / den, si = im / den;
+  const fitScale = Math.hypot(sr, si); // plan px per meter
+  if (S.useScale && proj.planFtPerPx) {
+    const k = 1 / (proj.planFtPerPx * M_PER_FT);
+    sr = sr / fitScale * k; si = si / fitScale * k;
+  }
+  const tx = mp.x - (sr * mg.e - si * mg.n), ty = mp.y - (sr * mg.n + si * mg.e);
+  gps.fit = { ref, sr, si, tx, ty, n: pts.length, fitScale };
+  updateGpsDot();
+  return gps.fit;
+}
+const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+function geoToPlan(lat, lon){
+  const f = gps.fit; if (!f) return null;
+  const g = toLocal(lat, lon, f.ref);
+  return { x: f.sr * g.e - f.si * g.n + f.tx, y: -(f.sr * g.n + f.si * g.e + f.ty) };
+}
+const pxPerM = () => gps.fit ? Math.hypot(gps.fit.sr, gps.fit.si) : NaN;
+const ftPerPx = () => proj.planFtPerPx || (1 / pxPerM()) / M_PER_FT;
+function geoResid(c){
+  if (!gps.fit || !isNum(c.lat) || !isNum(c.lon) || gps.fit.n < 3 && !S.useScale) return NaN;
+  const q = geoToPlan(c.lat, c.lon);
+  return Math.hypot(q.x - c.x, q.y - c.y) / pxPerM() / M_PER_FT;
+}
+function renderGeoStatus(){
+  const el = $('#geoStatus'); if (!el) return;
+  const set = S.geo.filter(c => isNum(c.lat) && isNum(c.lon));
+  let h = `<span>Control points</span><b>${S.geo.length}</b><span>Captured with GPS</span><b>${set.length}</b>`;
+  if (!gps.fit) h += `<span style="grid-column:1/3;color:var(--target)">Capture at least 2 points (3–4 is better) to turn on the GPS dot.</span>`;
+  else {
+    for (const c of set) { const r = geoResid(c); if (isFinite(r)) h += `<span>${esc(c.name)}</span><b style="color:${r > 15 ? 'var(--cut)' : 'var(--text)'}">±${r.toFixed(1)} ft</b>`; }
+    if (proj.planFtPerPx) {
+      const gpsFtPx = 1 / gps.fit.fitScale / M_PER_FT, pct = (gpsFtPx / proj.planFtPerPx - 1) * 100;
+      h += `<span>Scale check (GPS vs plan)</span><b style="color:${Math.abs(pct) > 10 ? 'var(--cut)' : 'var(--ok)'}">${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%</b>`;
+    }
+    h += `<span class="note" style="grid-column:1/3">A point off by more than ~15 ft was probably captured in the wrong spot or with poor signal – re-capture it.</span>`;
+  }
+  el.innerHTML = h;
+}
+$('#useScale').onchange = e => { S.useScale = e.target.checked; save(); geoFit(); renderGeoStatus(); renderPins(); };
+$('#resetCtl').onclick = function(){
+  if (this.dataset.armed && Date.now() - this.dataset.armed < 3000) {
+    S.geo = (proj.control || []).map(x => ({ ...x })); save(); geoFit(); renderGeoStatus(); renderPins();
+    this.textContent = 'Reset control points to defaults'; delete this.dataset.armed; toast('Control points reset');
+  } else { this.dataset.armed = Date.now(); this.textContent = 'Tap again to reset (clears GPS captures)'; setTimeout(() => { this.textContent = 'Reset control points to defaults'; }, 3000); }
+};
+
+/* live GPS dot */
+function startGps(){
+  if (!('geolocation' in navigator)) { toast('This phone/browser has no GPS access'); return false; }
+  if (gps.watch != null) return true;
+  gps.watch = navigator.geolocation.watchPosition(onFix, err => {
+    toast(err.code === 1 ? 'Location permission denied – allow it in browser settings' : 'GPS error: ' + err.message);
+    if (err.code === 1) stopGps();
+  }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 30000 });
+  return true;
+}
+function stopGps(){
+  if (gps.watch != null && !cap.active) { navigator.geolocation.clearWatch(gps.watch); gps.watch = null; }
+  gps.on = false; gps.follow = false; gps.plan = null; updateGpsDot(); updateGpsBtn(); updateHint();
+}
+function onFix(pos){
+  gps.fix = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, t: pos.timestamp };
+  if (cap.active) cap.samples.push(gps.fix);
+  if (gps.on) { updateGpsDot(); updateHint(); }
+}
+function updateGpsDot(){
+  const dot = $('#gpsDot'), acc = $('#gpsAcc');
+  if (!gps.on || !gps.fix || !gps.fit) { dot.style.display = acc.style.display = 'none'; gps.plan = null; return; }
+  const q = geoToPlan(gps.fix.lat, gps.fix.lon); gps.plan = q;
+  dot.style.display = acc.style.display = 'block';
+  dot.style.left = acc.style.left = q.x + 'px'; dot.style.top = acc.style.top = q.y + 'px';
+  const d = 2 * gps.fix.acc * pxPerM(); acc.style.width = acc.style.height = d + 'px';
+  if (gps.follow) centerOn(q.x, q.y);
+}
+function centerOn(x, y){
+  view.x = planView.clientWidth / 2 - x * view.s; view.y = planView.clientHeight / 2 - y * view.s; apply();
+}
+function stopFollow(){ if (gps.follow) { gps.follow = false; updateGpsBtn(); } }
+function updateGpsBtn(){
+  const b = $('#gpsBtn');
+  b.classList.toggle('gps-on', gps.on && !gps.follow); b.classList.toggle('gps-follow', gps.on && gps.follow);
+  $('#shotHere').style.display = gps.on && gps.fit ? 'block' : 'none';
+}
+$('#gpsBtn').onclick = () => {
+  if (!gps.on) {
+    if (!gps.fit) { toast('Capture GPS on at least 2 control points first (📍 Cal)'); mode = 'cal'; $$('#modeSeg button').forEach(x => x.classList.toggle('on', x.dataset.mode === 'cal')); renderPins(); updateHint(); return; }
+    if (!startGps()) return;
+    gps.on = true; gps.follow = true;
+    if (view.s < 0.35) { const cx = planView.clientWidth / 2, cy = planView.clientHeight / 2; zoomAt(cx, cy, 0.5 / view.s); }
+    toast('GPS on – following you');
+  } else if (!gps.follow) { gps.follow = true; if (gps.plan) centerOn(gps.plan.x, gps.plan.y); }
+  else { stopGps(); toast('GPS off'); return; }
+  updateGpsDot(); updateGpsBtn(); updateHint();
+};
+function nearestTarget(){
+  if (!gps.plan || !S.points.length) return null;
+  let best = null;
+  for (const p of S.points) { const ft = Math.hypot(p.x - gps.plan.x, p.y - gps.plan.y) * ftPerPx(); if (!best || ft < best.ft) best = { p, ft }; }
+  return best;
+}
+$('#shotHere').onclick = () => {
+  if (!gps.plan) return toast('Waiting for GPS…');
+  const near = nearestTarget();
+  if (near && near.ft <= Math.max(10, (gps.fix.acc / M_PER_FT))) openSheet({ kind: 'shot', x: near.p.x, y: near.p.y, from: near.p });
+  else openSheet({ kind: 'shot', x: gps.plan.x, y: gps.plan.y });
+};
+
+/* control point sheet + GPS capture */
+let curCp = null;
+const cap = { active: false, samples: [], timer: null };
+function openCtl(cp){
+  curCp = cp;
+  $('#cpName').value = cp.name || '';
+  $('#cpLat').value = isNum(cp.lat) ? cp.lat.toFixed(7) : '';
+  $('#cpLon').value = isNum(cp.lon) ? cp.lon.toFixed(7) : '';
+  $('#cpCapBox').style.display = 'none'; $('#cpCapture').textContent = 'Capture GPS here (20 sec)';
+  if (isNum(cp.acc)) { $('#cpCapBox').style.display = 'block'; $('#cpCapBox').className = 'result'; $('#cpCapVal').textContent = 'Captured ±' + (cp.acc / M_PER_FT).toFixed(0) + ' ft'; $('#cpCapMsg').textContent = cp.n + ' readings averaged'; }
+  $('#sheetBg').style.display = 'block';
+  requestAnimationFrame(() => $('#ctlSheet').classList.add('open'));
+}
+function closeCtl(){
+  endCapture(false);
+  $('#ctlSheet').classList.remove('open'); $('#sheetBg').style.display = 'none'; curCp = null; document.activeElement?.blur();
+}
+$('#cpCancel').onclick = closeCtl;
+$('#sheetBg').addEventListener('click', () => { if (curCp) closeCtl(); });
+$('#cpSave').onclick = () => {
+  const lat = num($('#cpLat').value), lon = num($('#cpLon').value);
+  curCp.name = $('#cpName').value.trim() || curCp.name;
+  if ($('#cpLat').value.trim() === '' && $('#cpLon').value.trim() === '') { curCp.lat = curCp.lon = null; }
+  else if (isFinite(lat) && isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) { if (lat !== curCp.lat || lon !== curCp.lon) { curCp.lat = lat; curCp.lon = lon; } }
+  else return toast('Latitude/longitude don’t look right');
+  save(); geoFit(); renderPins(); renderGeoStatus(); closeCtl(); toast('Control point saved');
+};
+$('#cpMove').onclick = () => { pendingMove = curCp; closeCtl(); renderPins(); updateHint(); };
+$('#cpClearGps').onclick = () => { curCp.lat = curCp.lon = curCp.acc = curCp.n = null; $('#cpLat').value = $('#cpLon').value = ''; $('#cpCapBox').style.display = 'none'; save(); geoFit(); renderPins(); };
+$('#cpDelete').onclick = function(){
+  if (this.dataset.armed && Date.now() - this.dataset.armed < 3000) {
+    S.geo = S.geo.filter(c => c !== curCp); delete this.dataset.armed; this.textContent = 'Delete point';
+    save(); geoFit(); renderPins(); closeCtl(); toast('Control point deleted');
+  } else { this.dataset.armed = Date.now(); this.textContent = 'Tap again to delete'; setTimeout(() => { this.textContent = 'Delete point'; }, 3000); }
+};
+$('#cpCapture').onclick = () => {
+  if (cap.active) return endCapture(true);
+  if (!('geolocation' in navigator)) return toast('No GPS access in this browser');
+  cap.active = true; cap.samples = []; cap.start = Date.now();
+  startGps();
+  $('#cpCapBox').style.display = 'block'; $('#cpCapBox').className = 'result';
+  $('#cpCapture').textContent = 'Stop and use readings';
+  let tick = 0;
+  cap.timer = setInterval(() => {
+    // phones that are standing still may stop pushing updates – ask for a fresh fix every second
+    if (++tick % 2 === 0) navigator.geolocation.getCurrentPosition(pos => {
+      if (cap.active) cap.samples.push({ lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, t: pos.timestamp });
+    }, () => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
+    const left = Math.max(0, 20 - Math.round((Date.now() - cap.start) / 1000));
+    const good = cap.samples.filter(x => x.acc <= 30);
+    const bestAcc = good.length ? Math.min(...good.map(x => x.acc)) : NaN;
+    $('#cpCapVal').textContent = left + ' s';
+    $('#cpCapMsg').textContent = `${cap.samples.length} readings` + (isFinite(bestAcc) ? ` · best ±${(bestAcc / M_PER_FT).toFixed(0)} ft` : ' · waiting for signal');
+    if (left === 0) endCapture(true);
+  }, 500);
+};
+function endCapture(use){
+  if (!cap.active) return;
+  clearInterval(cap.timer); cap.active = false;
+  if (!gps.on && gps.watch != null) { navigator.geolocation.clearWatch(gps.watch); gps.watch = null; }
+  $('#cpCapture').textContent = 'Capture GPS here (20 sec)';
+  if (!use || !curCp) return;
+  const good = cap.samples.filter(x => x.acc <= 30);
+  const best = good.length ? Math.min(...good.map(x => x.acc)) : Infinity;
+  if (!(good.length >= 3 || best <= 10)) { $('#cpCapBox').className = 'result cut'; $('#cpCapVal').textContent = 'Not enough signal'; $('#cpCapMsg').textContent = 'Need a solid fix (under ±30 ft). Step away from the building/trees and try again.'; return; }
+  let wl = 0, wa = 0, wo = 0;
+  for (const x of good) { const w = 1 / (x.acc * x.acc); wl += w; wa += x.lat * w; wo += x.lon * w; }
+  const lat = wa / wl, lon = wo / wl, acc = avg(good.map(x => x.acc)) / Math.sqrt(Math.min(good.length, 4));
+  curCp.lat = lat; curCp.lon = lon; curCp.acc = acc; curCp.n = good.length;
+  $('#cpLat').value = lat.toFixed(7); $('#cpLon').value = lon.toFixed(7);
+  $('#cpCapBox').className = 'result ok'; $('#cpCapVal').textContent = 'Captured ±' + (acc / M_PER_FT).toFixed(0) + ' ft';
+  $('#cpCapMsg').textContent = good.length + ' readings averaged · tap Save';
+  save(); geoFit(); renderPins();
+}
+
 /* ---------- header / project ---------- */
 function updateHeader(){
   $('#projName').textContent = proj.name;
@@ -704,7 +983,7 @@ function loadProject(id){
   view.fitted = false;
   img.onload = () => { fit(); renderPins(); };
   img.src = proj.plan;
-  updateHeader(); updateHint(); renderPins();
+  geoFit(); updateHeader(); updateHint(); renderPins();
   if ($('#setupView').classList.contains('active')) renderSetup();
 }
 

@@ -7,8 +7,15 @@
       "plan": "plans/home2-douglasville-grading.jpg",
       "planWidth": 4200,
       "planHeight": 3243,
+      "planFtPerPx": 0.14643,
       "elevPrefix": 1000,
       "benchmark": { "name": "Slab F.F.E.", "elev": 1015.50 },
+      "control": [
+        { "id": "c-nw", "name": "Bldg NW corner", "x": 1864, "y": 1685, "lat": null, "lon": null },
+        { "id": "c-ne", "name": "Bldg NE corner", "x": 3374, "y": 1655, "lat": null, "lon": null },
+        { "id": "c-se", "name": "Bldg SE corner", "x": 3384, "y": 2101, "lat": null, "lon": null },
+        { "id": "c-sw", "name": "Bldg SW corner", "x": 1872, "y": 2142, "lat": null, "lon": null }
+      ],
       "points": []
     }
   ]

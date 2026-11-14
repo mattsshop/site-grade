@@ -3,7 +3,7 @@
 Mobile web app for checking dirt grades with a rotating laser and a grade rod.
 Hosted on GitHub Pages; works offline after the first load.
 
-**Current version: v1.0.0**
+**Current version: v1.2.0**
 
 ## How it works
 1. **Setup** – shoot the benchmark (e.g. slab F.F.E.). App computes laser HI = BM elevation + rod reading.
@@ -15,9 +15,17 @@ Math: target dirt = plan elev − offset; actual dirt = HI − rod; cut(+)/fill(
 
 Spot elevations can be typed short (`14.33` → `1014.33`) using the project's elevation prefix.
 
+## GPS on the plan (v1.2)
+- Control points (purple crosshairs, **📍 Cal** mode) tie the plan to GPS. Defaults: the 4 building corners.
+- Tap a crosshair, stand on that spot, **Capture GPS here** (averages ~20 s). Need 2+, 3–4 is better.
+- Move / rename / add / delete control points any time; you can also type lat/long.
+- **📍** button: tap once = GPS on + follow, tap again after panning = re-center, tap while following = off.
+- "Lock to plan scale" uses the plan's 1"=30' (`planFtPerPx` in projects.json) so only position + rotation come from GPS.
+- Phone GPS is typically ±10–15 ft. Feed an RTK receiver into the phone's location (Android mock location) for inch-level.
+
 ## Adding a project
 1. Export the grading plan sheet as a JPG (~4000 px wide) into `plans/`.
-2. Add an entry to `projects.json` (name, plan path, image size, benchmark, elevPrefix, points).
+2. Add an entry to `projects.json` (name, plan path, image size, planFtPerPx, benchmark, elevPrefix, control, points).
 3. Add the plan path to the `SHELL` list in `sw.js` and bump `CACHE` + `VERSION` in `index.html`.
 
 ## Target points
