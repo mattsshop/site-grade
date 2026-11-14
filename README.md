@@ -1,1 +1,28 @@
-# site-grade
+# Site Grade – Cut/Fill
+
+Mobile web app for checking dirt grades with a rotating laser and a grade rod.
+Hosted on GitHub Pages; works offline after the first load.
+
+**Current version: v1.0.0**
+
+## How it works
+1. **Setup** – shoot the benchmark (e.g. slab F.F.E.). App computes laser HI = BM elevation + rod reading.
+2. **Plan** – tap where you're standing (or tap an orange target point), enter the plan elevation,
+   pick the offset (how far dirt sits below the plan elevation, e.g. 12" under top of curb), and the rod reading.
+3. App shows **CUT / FILL / ON GRADE** and drops a color-coded pin on the plan.
+
+Math: target dirt = plan elev − offset; actual dirt = HI − rod; cut(+)/fill(−) = actual − target.
+
+Spot elevations can be typed short (`14.33` → `1014.33`) using the project's elevation prefix.
+
+## Adding a project
+1. Export the grading plan sheet as a JPG (~4000 px wide) into `plans/`.
+2. Add an entry to `projects.json` (name, plan path, image size, benchmark, elevPrefix, points).
+3. Add the plan path to the `SHELL` list in `sw.js` and bump `CACHE` + `VERSION` in `index.html`.
+
+## Target points
+Add them in the app with **+ Point**, then *Setup → Export points*. Paste the exported `points`
+array into the project in `projects.json` so every phone gets them.
+
+## Releasing an update
+Bump `VERSION` in `index.html` and `CACHE` in `sw.js` together so phones pick up the new build.

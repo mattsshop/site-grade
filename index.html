@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1f2a37">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Site Grade">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Site Grade – Cut/Fill</title>
+<style>
+  :root{
+    --bg:#11181f; --panel:#1b242e; --panel2:#243040; --line:#334155;
+    --text:#e8edf2; --muted:#94a3b8; --accent:#f6c343;
+    --cut:#ef4444; --fill:#3b82f6; --ok:#22c55e; --target:#f59e0b;
+    --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font:16px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;overscroll-behavior:none}
+  body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+  header{padding:calc(8px + var(--safe-t)) 12px 8px;background:var(--panel);border-bottom:1px solid var(--line);
+    display:flex;align-items:center;gap:10px}
+  header .title{flex:1;min-width:0}
+  header h1{font-size:16px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header .sub{font-size:12px;color:var(--muted)}
+  .hi-badge{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:4px 10px;text-align:right}
+  .hi-badge b{display:block;font-size:16px;color:var(--accent)}
+  .hi-badge span{font-size:11px;color:var(--muted)}
+  main{flex:1;position:relative;overflow:hidden}
+  .view{position:absolute;inset:0;display:none;overflow:auto}
+  .view.active{display:block}
+  nav{display:flex;background:var(--panel);border-top:1px solid var(--line);padding-bottom:var(--safe-b)}
+  nav button{flex:1;background:none;border:0;color:var(--muted);padding:10px 0 8px;font-size:13px;font-weight:600}
+  nav button .ic{display:block;font-size:20px;line-height:1.1}
+  nav button.on{color:var(--accent)}
+
+  /* plan */
+  #planView{overflow:hidden;touch-action:none;background:#e9e9e4}
+  #stage{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+  #stage img{display:block;user-select:none;-webkit-user-drag:none;pointer-events:none}
+  .pin{position:absolute;transform:translate(-50%,-50%) scale(var(--inv,1));pointer-events:none;
+    display:flex;flex-direction:column;align-items:center}
+  .pin .dot{width:18px;height:18px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.5)}
+  .pin .lbl{margin-top:3px;font:700 12px/1 system-ui,sans-serif;color:#fff;padding:3px 5px;border-radius:5px;white-space:nowrap;
+    box-shadow:0 1px 3px rgba(0,0,0,.4)}
+  .pin.target .dot{border-radius:3px;background:var(--target);transform:rotate(45deg)}
+  .pin.target .lbl{background:#92400e}
+  .pin.cut .dot,.pin.cut .lbl{background:var(--cut)}
+  .pin.fill .dot,.pin.fill .lbl{background:var(--fill)}
+  .pin.ok .dot,.pin.ok .lbl{background:var(--ok)}
+  .pin.sel .dot{outline:3px solid var(--accent);outline-offset:2px}
+  .plan-tools{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;align-items:flex-start;pointer-events:none}
+  .seg{display:flex;background:rgba(17,24,31,.88);border-radius:12px;padding:3px;pointer-events:auto;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .seg button{background:none;border:0;color:var(--muted);font-weight:700;font-size:14px;padding:8px 12px;border-radius:9px}
+  .seg button.on{background:var(--accent);color:#111}
+  .fab-col{margin-left:auto;display:flex;flex-direction:column;gap:8px;pointer-events:auto}
+  .fab{width:44px;height:44px;border-radius:12px;border:0;background:rgba(17,24,31,.88);color:#fff;font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+  .hint{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:rgba(17,24,31,.88);color:#fff;
+    padding:8px 14px;border-radius:20px;font-size:13px;pointer-events:none;white-space:nowrap;max-width:94%;overflow:hidden;text-overflow:ellipsis}
+  .warn-banner{position:absolute;left:10px;right:10px;bottom:60px;background:#7c2d12;color:#fff;border-radius:10px;padding:10px 12px;font-size:14px;pointer-events:auto}
+
+  /* forms / cards */
+  .pad{padding:14px 14px 30px;max-width:640px;margin:0 auto}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+  .card h2{font-size:15px;margin:0 0 10px;color:var(--accent);text-transform:uppercase;letter-spacing:.04em}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+  input,select{width:100%;font-size:20px;padding:12px;border-radius:10px;border:1px solid var(--line);background:#0d141b;color:var(--text)}
+  input:focus,select:focus{outline:2px solid var(--accent);border-color:transparent}
+  .row{display:flex;gap:10px}.row>*{flex:1}
+  .btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font-size:17px;font-weight:700;margin-top:12px;background:var(--accent);color:#111}
+  .btn.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+  .btn.danger{background:#7f1d1d;color:#fff}
+  .btn.sm{padding:10px;font-size:15px;margin-top:8px}
+  .muted{color:var(--muted);font-size:13px}
+  .big{font-size:28px;font-weight:800;color:var(--accent)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:10px 12px;border-radius:10px;font-size:15px;font-weight:700}
+  .chip.on{background:var(--accent);color:#111;border-color:var(--accent)}
+  .note{font-size:13px;color:var(--muted);margin-top:6px}
+
+  /* bottom sheet */
+  .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:20}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:21;background:var(--panel);border-radius:18px 18px 0 0;
+    max-height:92dvh;overflow:auto;padding:8px 14px calc(16px + var(--safe-b));transform:translateY(105%);transition:transform .2s ease;
+    border-top:1px solid var(--line);max-width:640px;margin:0 auto}
+  .sheet.open{transform:none}
+  .sheet .grab{width:44px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 8px}
+  .sheet h3{margin:0 0 4px;font-size:17px}
+  .result{margin-top:12px;border-radius:14px;padding:14px;text-align:center;background:var(--panel2);border:1px solid var(--line)}
+  .result .rv{font-size:44px;font-weight:900;line-height:1.05;letter-spacing:.01em}
+  .result .rs{font-size:14px;color:var(--muted);margin-top:4px}
+  .result.cut{background:#450a0a;border-color:var(--cut)} .result.cut .rv{color:#fca5a5}
+  .result.fill{background:#0b2447;border-color:var(--fill)} .result.fill .rv{color:#93c5fd}
+  .result.ok{background:#052e16;border-color:var(--ok)} .result.ok .rv{color:#86efac}
+  .calc{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:14px;margin-top:10px;color:var(--muted)}
+  .calc b{color:var(--text);text-align:right;font-variant-numeric:tabular-nums}
+
+  /* log */
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase}
+  td:last-child{white-space:nowrap} td.c{color:#fca5a5;font-weight:800} td.f{color:#93c5fd;font-weight:800} td.k{color:#86efac;font-weight:800}
+  .toast{position:fixed;left:50%;bottom:calc(76px + var(--safe-b));transform:translateX(-50%);background:#0d141b;border:1px solid var(--accent);
+    color:#fff;padding:10px 16px;border-radius:12px;z-index:50;font-size:14px;display:none;max-width:90%}
+  .ver{font-size:12px;color:var(--muted);text-align:center;margin-top:10px}
+</style>
+</head>
+<body>
+<header>
+  <div class="title">
+    <h1 id="projName">Site Grade</h1>
+    <div class="sub"><span id="projSheet"></span></div>
+  </div>
+  <div class="hi-badge" id="hiBadge">
+    <b id="hiVal">—</b><span>Laser HI</span>
+  </div>
+</header>
+
+<main>
+  <!-- PLAN -->
+  <section class="view active" id="planView">
+    <div id="stage"><img id="planImg" alt="Site plan"><div id="pins"></div></div>
+    <div class="plan-tools">
+      <div class="seg" id="modeSeg">
+        <button data-mode="shoot" class="on">Shoot</button>
+        <button data-mode="point">+ Point</button>
+      </div>
+      <div class="fab-col">
+        <button class="fab" id="zoomIn" aria-label="Zoom in">+</button>
+        <button class="fab" id="zoomOut" aria-label="Zoom out">−</button>
+        <button class="fab" id="zoomFit" aria-label="Fit plan">⤢</button>
+      </div>
+    </div>
+    <div class="warn-banner" id="noHiBanner" style="display:none">
+      Set up the laser first: go to <b>Setup</b> and shoot the benchmark.
+    </div>
+    <div class="hint" id="hint">Tap where you're standing to take a shot</div>
+  </section>
+
+  <!-- SETUP -->
+  <section class="view" id="setupView">
+    <div class="pad">
+      <div class="card">
+        <h2>Project</h2>
+        <select id="projSelect"></select>
+      </div>
+
+      <div class="card">
+        <h2>1 · Shoot the benchmark</h2>
+        <div class="muted">Set the rod on the benchmark (e.g. finished slab) and read the rod at the laser beam.</div>
+        <label>Benchmark name</label>
+        <input id="bmName" type="text" placeholder="Slab F.F.E.">
+        <div class="row">
+          <div><label>Benchmark elevation (ft)</label><input id="bmElev" type="text" inputmode="decimal" placeholder="1015.50"></div>
+          <div><label>Rod reading on BM (ft)</label><input id="bmRod" type="text" inputmode="decimal" placeholder="4.50"></div>
+        </div>
+        <div class="result" id="hiResult" style="margin-top:14px">
+          <div class="rs">Laser height of instrument (HI)</div>
+          <div class="rv" id="hiCalc" style="color:var(--accent)">—</div>
+          <div class="rs" id="hiFormula"></div>
+        </div>
+        <button class="btn" id="saveSetup">Save setup</button>
+      </div>
+
+      <div class="card">
+        <h2>2 · Re-check benchmark</h2>
+        <div class="muted">Do this every couple of hours or if the laser may have been bumped.</div>
+        <label>Rod reading on BM now (ft)</label>
+        <input id="chkRod" type="text" inputmode="decimal" placeholder="4.50">
+        <div class="result" id="chkResult" style="display:none"><div class="rv" id="chkVal"></div><div class="rs" id="chkMsg"></div></div>
+        <button class="btn ghost" id="chkBtn">Check</button>
+      </div>
+
+      <div class="card">
+        <h2>Settings</h2>
+        <label>On-grade tolerance (± ft)</label>
+        <input id="tol" type="text" inputmode="decimal" placeholder="0.10">
+        <label>Short elevation prefix</label>
+        <input id="prefix" type="text" inputmode="decimal" placeholder="1000">
+        <div class="note">Plans show spot elevations like <b>14.33</b> meaning 1014.33. Anything you type under 100 gets this prefix added.</div>
+        <label>Offset presets (inches below plan elevation, comma separated)</label>
+        <input id="presets" type="text" inputmode="text" placeholder="0, 4, 6, 8, 12">
+        <button class="btn ghost" id="saveSettings">Save settings</button>
+      </div>
+
+      <div class="card">
+        <h2>Target points</h2>
+        <div class="muted">Pre-loaded points (curb corners, grade breaks, pad corners) the super just taps and shoots. Add them on the Plan tab with <b>+ Point</b>.</div>
+        <div id="ptCount" class="muted" style="margin-top:8px"></div>
+        <button class="btn ghost sm" id="exportPts">Export points (JSON)</button>
+        <button class="btn ghost sm" id="importPtsBtn">Import points (JSON)</button>
+        <input type="file" id="importPts" accept="application/json,.json" style="display:none">
+      </div>
+      <div class="ver" id="verLbl"></div>
+    </div>
+  </section>
+
+  <!-- LOG -->
+  <section class="view" id="logView">
+    <div class="pad">
+      <div class="card">
+        <h2>Shot log</h2>
+        <div id="logSummary" class="muted"></div>
+        <div style="overflow-x:auto;margin-top:8px">
+          <table>
+            <thead><tr><th>#</th><th>Time</th><th>Point</th><th>Target</th><th>Rod</th><th>Result</th></tr></thead>
+            <tbody id="logBody"></tbody>
+          </table>
+        </div>
+        <button class="btn" id="shareCsv">Share / download CSV</button>
+        <button class="btn ghost" id="sharePlan">Share marked-up plan (image)</button>
+        <button class="btn danger" id="clearLog">Clear all shots</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button data-view="planView" class="on"><span class="ic">🗺️</span>Plan</button>
+  <button data-view="setupView"><span class="ic">⚙️</span>Setup</button>
+  <button data-view="logView"><span class="ic">📋</span>Log</button>
+</nav>
+
+<!-- Shot / point sheet -->
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="sheet">
+  <div class="grab"></div>
+  <h3 id="shTitle">New shot</h3>
+  <div class="muted" id="shSub"></div>
+
+  <div id="shNameWrap">
+    <label>Point name</label>
+    <input id="shName" type="text" placeholder="e.g. Curb NE corner">
+  </div>
+  <label>Plan elevation (ft) <span class="muted" id="shElevResolved"></span></label>
+  <input id="shElev" type="text" inputmode="decimal" placeholder="14.33 or 1014.33">
+  <label>Offset – dirt is this far below plan elevation</label>
+  <div class="chips" id="offsetChips"></div>
+  <div class="row" style="margin-top:8px">
+    <div><input id="shOffset" type="text" inputmode="decimal" placeholder="inches"></div>
+    <div style="flex:0 0 auto;align-self:center" class="muted">inches</div>
+  </div>
+
+  <div id="shRodWrap">
+    <label>Rod reading here (ft)</label>
+    <input id="shRod" type="text" inputmode="decimal" placeholder="e.g. 5.80">
+    <div class="result" id="shResult">
+      <div class="rv" id="shRv">—</div>
+      <div class="rs" id="shRs">Enter plan elevation and rod reading</div>
+    </div>
+    <div class="calc" id="shCalc"></div>
+  </div>
+
+  <div class="row">
+    <button class="btn ghost" id="shCancel">Cancel</button>
+    <button class="btn" id="shSave">Save shot</button>
+  </div>
+  <button class="btn danger sm" id="shDelete" style="display:none">Delete</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const VERSION = '1.0.0';
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+/* ---------- storage (wrapped: storage can be unavailable) ---------- */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ toast('Could not save on this device'); } }
+};
+
+/* ---------- state ---------- */
+let projects = [], proj = null, S = null; // S = per-project saved state
+const defaults = p => ({
+  bm: { name: p.benchmark?.name || 'Benchmark', elev: p.benchmark?.elev ?? null, rod: null, time: null },
+  tol: 0.10,
+  prefix: p.elevPrefix ?? 0,
+  presets: [0, 4, 6, 8, 12],
+  points: (p.points || []).map(x => ({...x})),
+  shots: [],
+  nextShot: 1
+});
+const key = () => 'sg:' + proj.id;
+const save = () => store.set(key(), S);
+
+/* ---------- number helpers ---------- */
+const num = v => { if (v == null) return NaN; const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : NaN; };
+const f2 = n => isFinite(n) ? n.toFixed(2) : '—';
+function resolveElev(v){
+  const n = num(v);
+  if (!isFinite(n)) return NaN;
+  return (n < 100 && S.prefix) ? n + S.prefix : n;
+}
+function toInches(ft){
+  const q = Math.round(Math.abs(ft) * 12 * 4) / 4; // nearest 1/4"
+  const whole = Math.floor(q), frac = q - whole;
+  const fr = frac === 0 ? '' : frac === .25 ? '¼' : frac === .5 ? '½' : '¾';
+  return (whole || !fr ? whole : '') + fr + '"';
+}
+const isNum = v => typeof v === 'number' && isFinite(v);
+const HI = () => (isNum(S.bm.elev) && isNum(S.bm.rod)) ? S.bm.elev + S.bm.rod : NaN;
+
+/* cut/fill core:  target = plan - offset ; actual = HI - rod ; diff = actual - target (+ = CUT, - = FILL) */
+function compute(planElev, offsetIn, rod){
+  const hi = HI();
+  const target = planElev - (offsetIn || 0) / 12;
+  const actual = hi - rod;
+  const diff = actual - target;
+  const rodTarget = hi - target;
+  let cls = 'ok';
+  if (diff > S.tol + 1e-9) cls = 'cut'; else if (diff < -S.tol - 1e-9) cls = 'fill';
+  return { hi, target, actual, diff, rodTarget, cls };
+}
+function resultText(r){
+  if (!isFinite(r.diff)) return '—';
+  if (r.cls === 'ok') return 'ON GRADE';
+  return (r.cls === 'cut' ? 'CUT ' : 'FILL ') + Math.abs(r.diff).toFixed(2) + "'";
+}
+
+/* ---------- toast ---------- */
+let tt;
+function toast(m){ const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(tt); tt = setTimeout(() => t.style.display = 'none', 2200); }
+
+/* ---------- navigation ---------- */
+$$('nav button').forEach(b => b.onclick = () => showView(b.dataset.view));
+function showView(id){
+  $$('nav button').forEach(b => b.classList.toggle('on', b.dataset.view === id));
+  $$('.view').forEach(v => v.classList.toggle('active', v.id === id));
+  if (id === 'planView') { requestAnimationFrame(() => { if (!view.fitted) fit(); }); }
+  if (id === 'logView') renderLog();
+  if (id === 'setupView') renderSetup();
+}
+
+/* ---------- plan pan / zoom ---------- */
+const planView = $('#planView'), stage = $('#stage'), img = $('#planImg');
+const view = { s: 1, x: 0, y: 0, min: .05, max: 4, fitted: false };
+function apply(){
+  stage.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.s})`;
+  stage.style.setProperty('--inv', 1 / view.s);
+}
+function fit(){
+  const W = planView.clientWidth, H = planView.clientHeight;
+  if (!W || !img.naturalWidth) return;
+  const s = Math.min(W / img.naturalWidth, (H - 60) / img.naturalHeight);
+  view.min = s * .8; view.s = s;
+  view.x = (W - img.naturalWidth * s) / 2; view.y = (H - img.naturalHeight * s) / 2 + 20;
+  view.fitted = true; apply();
+}
+function zoomAt(cx, cy, factor){
+  const ns = Math.min(view.max, Math.max(view.min, view.s * factor));
+  const k = ns / view.s;
+  view.x = cx - (cx - view.x) * k; view.y = cy - (cy - view.y) * k; view.s = ns; apply();
+}
+$('#zoomIn').onclick = () => zoomAt(planView.clientWidth / 2, planView.clientHeight / 2, 1.6);
+$('#zoomOut').onclick = () => zoomAt(planView.clientWidth / 2, planView.clientHeight / 2, 1 / 1.6);
+$('#zoomFit').onclick = fit;
+planView.addEventListener('wheel', e => {
+  e.preventDefault(); const r = planView.getBoundingClientRect();
+  zoomAt(e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.15 : 1 / 1.15);
+}, { passive: false });
+
+const ptrs = new Map(); let gesture = null;
+planView.addEventListener('pointerdown', e => {
+  if (e.target.closest('.plan-tools, .warn-banner')) return;
+  planView.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (ptrs.size === 1) gesture = { tap: true, t: Date.now(), sx: e.clientX, sy: e.clientY, lx: e.clientX, ly: e.clientY };
+  else if (gesture) { gesture.tap = false; gesture.pinch = pinchState(); }
+});
+function pinchState(){
+  const [a, b] = [...ptrs.values()];
+  return { d: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 };
+}
+planView.addEventListener('pointermove', e => {
+  if (!ptrs.has(e.pointerId) || !gesture) return;
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const r = planView.getBoundingClientRect();
+  if (ptrs.size >= 2 && gesture.pinch) {
+    const p = pinchState();
+    view.x += p.cx - gesture.pinch.cx; view.y += p.cy - gesture.pinch.cy;
+    zoomAt(p.cx - r.left, p.cy - r.top, p.d / gesture.pinch.d);
+    gesture.pinch = p;
+  } else if (ptrs.size === 1) {
+    if (Math.hypot(e.clientX - gesture.sx, e.clientY - gesture.sy) > 8) gesture.tap = false;
+    if (!gesture.tap) { view.x += e.clientX - gesture.lx; view.y += e.clientY - gesture.ly; apply(); }
+    gesture.lx = e.clientX; gesture.ly = e.clientY;
+  }
+});
+function endPtr(e){
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (ptrs.size === 1 && gesture) { const [p] = [...ptrs.values()]; gesture.lx = p.x; gesture.ly = p.y; gesture.pinch = null; }
+  if (ptrs.size === 0 && gesture) {
+    if (gesture.tap && Date.now() - gesture.t < 500 && e.type === 'pointerup') onTap(e.clientX, e.clientY);
+    gesture = null;
+  }
+}
+planView.addEventListener('pointerup', endPtr);
+planView.addEventListener('pointercancel', endPtr);
+
+/* ---------- mode ---------- */
+let mode = 'shoot';
+$$('#modeSeg button').forEach(b => b.onclick = () => {
+  mode = b.dataset.mode;
+  $$('#modeSeg button').forEach(x => x.classList.toggle('on', x === b));
+  updateHint();
+});
+function updateHint(){
+  $('#hint').textContent = mode === 'shoot'
+    ? (S.points.length ? 'Tap an orange point, or tap where you are standing' : 'Tap where you are standing to take a shot')
+    : 'Tap the plan to add a target point';
+  $('#noHiBanner').style.display = (mode === 'shoot' && !isFinite(HI())) ? 'block' : 'none';
+}
+
+/* ---------- tap handling ---------- */
+function onTap(cx, cy){
+  const r = planView.getBoundingClientRect();
+  const px = (cx - r.left - view.x) / view.s, py = (cy - r.top - view.y) / view.s;
+  // hit-test pins within 24 screen px (targets first)
+  const near = (o) => Math.hypot((o.x - px) * view.s, (o.y - py) * view.s) < 24;
+  const tgt = S.points.find(near);
+  const shot = [...S.shots].reverse().find(near);
+  if (mode === 'point') {
+    if (tgt) return openSheet({ kind: 'point', point: tgt });
+    return openSheet({ kind: 'point', x: px, y: py });
+  }
+  if (shot && (!tgt || Math.hypot(shot.x - px, shot.y - py) < Math.hypot(tgt.x - px, tgt.y - py))) return openSheet({ kind: 'shot', shot });
+  if (tgt) return openSheet({ kind: 'shot', x: tgt.x, y: tgt.y, from: tgt });
+  if (px < 0 || py < 0 || px > img.naturalWidth || py > img.naturalHeight) return;
+  openSheet({ kind: 'shot', x: px, y: py });
+}
+
+/* ---------- pins ---------- */
+function renderPins(){
+  const html = [];
+  for (const p of S.points) {
+    html.push(`<div class="pin target" style="left:${p.x}px;top:${p.y}px"><div class="dot"></div><div class="lbl">${esc(p.name || 'Pt')} · ${f2(p.elev)}${p.offset ? ' −' + p.offset + '"' : ''}</div></div>`);
+  }
+  for (const s of S.shots) {
+    const r = compute(s.elev, s.offset, s.rod);
+    html.push(`<div class="pin ${r.cls}" style="left:${s.x}px;top:${s.y}px"><div class="dot"></div><div class="lbl">${resultText(r)}</div></div>`);
+  }
+  $('#pins').innerHTML = html.join('');
+}
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+/* ---------- sheet ---------- */
+let ctx = null, curOffset = 0;
+function renderChips(){
+  $('#offsetChips').innerHTML = S.presets.map(v => `<button class="chip" data-v="${v}">${v === 0 ? 'None' : '−' + v + '"'}</button>`).join('');
+  $$('#offsetChips .chip').forEach(c => c.onclick = () => { setOffset(num(c.dataset.v)); });
+}
+function setOffset(v){
+  curOffset = isFinite(v) ? v : 0;
+  $('#shOffset').value = curOffset ? curOffset : '';
+  $$('#offsetChips .chip').forEach(c => c.classList.toggle('on', num(c.dataset.v) === curOffset));
+  liveCalc();
+}
+$('#shOffset').oninput = () => { curOffset = num($('#shOffset').value) || 0; $$('#offsetChips .chip').forEach(c => c.classList.toggle('on', num(c.dataset.v) === curOffset)); liveCalc(); };
+$('#shElev').oninput = liveCalc;
+$('#shRod').oninput = liveCalc;
+
+function openSheet(c){
+  ctx = c;
+  renderChips();
+  const isPoint = c.kind === 'point';
+  const existingShot = c.kind === 'shot' && c.shot;
+  const existingPt = isPoint && c.point;
+  $('#shTitle').textContent = isPoint ? (existingPt ? 'Edit target point' : 'New target point')
+                            : existingShot ? `Shot #${c.shot.n}` : (c.from ? `Shoot: ${c.from.name || 'point'}` : 'New shot');
+  $('#shSub').textContent = isPoint ? 'Saved on this phone. The super taps it later and only enters the rod reading.'
+                         : existingShot ? new Date(c.shot.time).toLocaleString() : (isFinite(HI()) ? 'Laser HI ' + f2(HI()) : '⚠ Laser not set up – go to Setup first');
+  $('#shRodWrap').style.display = isPoint ? 'none' : 'block';
+  $('#shSave').textContent = isPoint ? 'Save point' : existingShot ? 'Update shot' : 'Save shot';
+  $('#shDelete').style.display = (existingShot || existingPt) ? 'block' : 'none';
+
+  const src = existingShot ? c.shot : existingPt ? c.point : c.from || null;
+  $('#shName').value = src?.name || '';
+  $('#shName').placeholder = isPoint ? 'e.g. Curb NE corner' : 'Optional – e.g. pad SW';
+  $('#shElev').value = src && isFinite(src.elev) ? src.elev.toFixed(2) : '';
+  setOffset(src?.offset ?? 0);
+  $('#shRod').value = existingShot ? c.shot.rod.toFixed(2) : '';
+  liveCalc();
+  $('#sheetBg').style.display = 'block';
+  requestAnimationFrame(() => $('#sheet').classList.add('open'));
+  setTimeout(() => {
+    const focusEl = (c.from || existingShot) ? $('#shRod') : isPoint ? $('#shName') : $('#shElev');
+    focusEl.focus({ preventScroll: true });
+  }, 230);
+}
+function closeSheet(){ $('#sheet').classList.remove('open'); $('#sheetBg').style.display = 'none'; ctx = null; document.activeElement?.blur(); }
+$('#sheetBg').onclick = closeSheet; $('#shCancel').onclick = closeSheet;
+
+function liveCalc(){
+  const e = resolveElev($('#shElev').value);
+  $('#shElevResolved').textContent = (isFinite(e) && num($('#shElev').value) < 100) ? '= ' + f2(e) : '';
+  if (ctx?.kind === 'point') return;
+  const rod = num($('#shRod').value), box = $('#shResult');
+  box.className = 'result';
+  if (!isFinite(HI())) { $('#shRv').textContent = 'No HI'; $('#shRs').textContent = 'Shoot the benchmark in Setup first'; $('#shCalc').innerHTML = ''; return; }
+  if (!isFinite(e)) { $('#shRv').textContent = '—'; $('#shRs').textContent = 'Enter the plan elevation'; $('#shCalc').innerHTML = ''; return; }
+  const r0 = compute(e, curOffset, NaN);
+  if (!isFinite(rod)) {
+    $('#shRv').textContent = '—';
+    $('#shRs').textContent = `On grade when rod reads ${f2(r0.rodTarget)}'`;
+    $('#shCalc').innerHTML = `<span>Target dirt elevation</span><b>${f2(r0.target)}</b><span>Rod should read</span><b>${f2(r0.rodTarget)}</b>`;
+    return;
+  }
+  const r = compute(e, curOffset, rod);
+  box.classList.add(r.cls);
+  $('#shRv').textContent = resultText(r);
+  $('#shRs').textContent = r.cls === 'ok' ? `Within ±${S.tol.toFixed(2)}' (${(r.diff >= 0 ? '+' : '−') + Math.abs(r.diff).toFixed(2)}')`
+                                         : `${toInches(r.diff)} ${r.cls === 'cut' ? 'too high' : 'too low'} · on grade at rod ${f2(r.rodTarget)}'`;
+  $('#shCalc').innerHTML =
+    `<span>Plan elevation</span><b>${f2(e)}</b>` +
+    `<span>Offset</span><b>−${curOffset || 0}" (${f2((curOffset || 0) / 12)}')</b>` +
+    `<span>Target dirt</span><b>${f2(r.target)}</b>` +
+    `<span>Laser HI</span><b>${f2(r.hi)}</b>` +
+    `<span>Actual dirt (HI − rod)</span><b>${f2(r.actual)}</b>` +
+    `<span>Rod should read</span><b>${f2(r.rodTarget)}</b>`;
+}
+
+$('#shSave').onclick = () => {
+  const e = resolveElev($('#shElev').value);
+  if (!isFinite(e)) return toast('Enter the plan elevation');
+  const name = $('#shName').value.trim();
+  if (ctx.kind === 'point') {
+    if (ctx.point) Object.assign(ctx.point, { name, elev: e, offset: curOffset });
+    else S.points.push({ id: 'p' + Date.now(), name, elev: e, offset: curOffset, x: Math.round(ctx.x), y: Math.round(ctx.y) });
+    save(); renderPins(); closeSheet(); updateHint(); toast('Point saved'); return;
+  }
+  if (!isFinite(HI())) return toast('Set up the laser first (Setup tab)');
+  const rod = num($('#shRod').value);
+  if (!isFinite(rod)) return toast('Enter the rod reading');
+  if (ctx.shot) Object.assign(ctx.shot, { name, elev: e, offset: curOffset, rod });
+  else S.shots.push({ n: S.nextShot++, time: Date.now(), name, elev: e, offset: curOffset, rod, hi: HI(),
+                      x: Math.round(ctx.x), y: Math.round(ctx.y), pointId: ctx.from?.id || null });
+  const r = compute(e, curOffset, rod);
+  save(); renderPins(); closeSheet(); toast(`Saved – ${resultText(r)}`);
+};
+$('#shDelete').onclick = () => {
+  if (!confirmLite()) return;
+  if (ctx.kind === 'point') S.points = S.points.filter(p => p !== ctx.point);
+  else S.shots = S.shots.filter(s => s !== ctx.shot);
+  save(); renderPins(); closeSheet(); updateHint(); toast('Deleted');
+};
+// double-tap style confirm without a blocking dialog
+let armed = 0;
+function confirmLite(){
+  if (Date.now() - armed < 3000) { armed = 0; $('#shDelete').textContent = 'Delete'; return true; }
+  armed = Date.now(); $('#shDelete').textContent = 'Tap again to delete';
+  setTimeout(() => { $('#shDelete').textContent = 'Delete'; }, 3000);
+  return false;
+}
+
+/* ---------- setup ---------- */
+function renderSetup(){
+  $('#projSelect').innerHTML = projects.map(p => `<option value="${p.id}" ${p.id === proj.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
+  $('#bmName').value = S.bm.name || '';
+  $('#bmElev').value = isFinite(S.bm.elev) && S.bm.elev != null ? S.bm.elev.toFixed(2) : '';
+  $('#bmRod').value = isFinite(S.bm.rod) && S.bm.rod != null ? S.bm.rod.toFixed(2) : '';
+  $('#tol').value = S.tol.toFixed(2);
+  $('#prefix').value = S.prefix || '';
+  $('#presets').value = S.presets.join(', ');
+  $('#ptCount').textContent = `${S.points.length} target point${S.points.length === 1 ? '' : 's'} on this project.`;
+  $('#chkResult').style.display = 'none'; $('#chkRod').value = '';
+  setupCalc();
+}
+function setupCalc(){
+  const e = resolveElev($('#bmElev').value), r = num($('#bmRod').value);
+  if (isFinite(e) && isFinite(r)) { $('#hiCalc').textContent = f2(e + r); $('#hiFormula').textContent = `${f2(e)} + ${f2(r)} rod`; }
+  else { $('#hiCalc').textContent = '—'; $('#hiFormula').textContent = 'Benchmark elevation + rod reading'; }
+}
+$('#bmElev').oninput = setupCalc; $('#bmRod').oninput = setupCalc;
+$('#saveSetup').onclick = () => {
+  const e = resolveElev($('#bmElev').value), r = num($('#bmRod').value);
+  if (!isFinite(e) || !isFinite(r)) return toast('Enter benchmark elevation and rod reading');
+  S.bm = { name: $('#bmName').value.trim() || 'Benchmark', elev: e, rod: r, time: Date.now() };
+  save(); updateHeader(); updateHint(); toast('Laser HI set to ' + f2(e + r)); showView('planView');
+};
+$('#chkBtn').onclick = () => {
+  const r = num($('#chkRod').value);
+  if (!isFinite(r) || !isFinite(HI())) return toast(isFinite(HI()) ? 'Enter the rod reading' : 'Save a setup first');
+  const d = r - S.bm.rod; // + means rod reads more = laser lower
+  const box = $('#chkResult'); box.style.display = 'block';
+  const ok = Math.abs(d) <= 0.02;
+  box.className = 'result ' + (ok ? 'ok' : 'cut');
+  $('#chkVal').textContent = ok ? 'GOOD' : `OFF ${Math.abs(d).toFixed(2)}'`;
+  $('#chkMsg').textContent = ok ? `Within 0.02' of setup (${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(2)}')`
+                                : `Laser has moved ${d > 0 ? 'down' : 'up'}. Tap "Use new reading" to reset HI.`;
+  if (!ok) {
+    $('#chkMsg').innerHTML += '<button class="btn sm" id="useNew">Use new reading</button>';
+    $('#useNew').onclick = () => { S.bm.rod = r; S.bm.time = Date.now(); save(); updateHeader(); renderSetup(); toast('HI reset to ' + f2(HI())); };
+  }
+};
+$('#saveSettings').onclick = () => {
+  const t = num($('#tol').value); if (isFinite(t) && t >= 0) S.tol = t;
+  const p = num($('#prefix').value); S.prefix = isFinite(p) ? p : 0;
+  const pr = $('#presets').value.split(',').map(num).filter(isFinite);
+  S.presets = [...new Set([0, ...pr])].sort((a, b) => a - b);
+  save(); renderPins(); toast('Settings saved');
+};
+$('#projSelect').onchange = e => loadProject(e.target.value);
+$('#exportPts').onclick = () => {
+  const data = JSON.stringify({ project: proj.id, points: S.points }, null, 2);
+  shareFile(new Blob([data], { type: 'application/json' }), `${proj.id}-points.json`);
+};
+$('#importPtsBtn').onclick = () => $('#importPts').click();
+$('#importPts').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text());
+    const pts = Array.isArray(j) ? j : j.points;
+    if (!Array.isArray(pts)) throw 0;
+    S.points = pts.filter(p => isFinite(p.x) && isFinite(p.y) && isFinite(p.elev));
+    save(); renderPins(); renderSetup(); updateHint(); toast(`Imported ${S.points.length} points`);
+  } catch (err) { toast('Not a valid points file'); }
+  e.target.value = '';
+};
+
+/* ---------- log ---------- */
+function renderLog(){
+  const rows = [...S.shots].reverse().map(s => {
+    const r = compute(s.elev, s.offset, s.rod);
+    const c = r.cls === 'cut' ? 'c' : r.cls === 'fill' ? 'f' : 'k';
+    return `<tr><td>${s.n}</td><td>${new Date(s.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</td>
+      <td>${esc(s.name || '')}</td><td>${f2(r.target)}</td><td>${f2(s.rod)}</td><td class="${c}">${resultText(r)}</td></tr>`;
+  });
+  $('#logBody').innerHTML = rows.join('') || '<tr><td colspan="6" class="muted">No shots yet.</td></tr>';
+  const cut = S.shots.filter(s => compute(s.elev, s.offset, s.rod).cls === 'cut').length;
+  const fill = S.shots.filter(s => compute(s.elev, s.offset, s.rod).cls === 'fill').length;
+  $('#logSummary').textContent = `${S.shots.length} shots · ${cut} cut · ${fill} fill · ${S.shots.length - cut - fill} on grade (±${S.tol.toFixed(2)}')`;
+}
+function csv(){
+  const head = ['Shot', 'Date', 'Time', 'Point', 'Plan Elev', 'Offset (in)', 'Target Dirt', 'Laser HI', 'Rod', 'Actual Dirt', 'Cut(+)/Fill(-) ft', 'Result', 'Plan X', 'Plan Y'];
+  const lines = [head.join(',')];
+  for (const s of S.shots) {
+    const r = compute(s.elev, s.offset, s.rod), d = new Date(s.time);
+    lines.push([s.n, d.toLocaleDateString(), d.toLocaleTimeString(), `"${(s.name || '').replace(/"/g, '""')}"`, f2(s.elev), s.offset || 0,
+      f2(r.target), f2(r.hi), f2(s.rod), f2(r.actual), r.diff.toFixed(3), resultText(r), s.x, s.y].join(','));
+  }
+  return lines.join('\n');
+}
+async function shareFile(blob, name){
+  const file = new File([blob], name, { type: blob.type });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: name }); return; }
+  } catch (e) { if (e.name === 'AbortError') return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+const stamp = () => new Date().toISOString().slice(0, 10);
+$('#shareCsv').onclick = () => S.shots.length ? shareFile(new Blob([csv()], { type: 'text/csv' }), `${proj.id}-shots-${stamp()}.csv`) : toast('No shots yet');
+$('#sharePlan').onclick = () => {
+  if (!S.shots.length && !S.points.length) return toast('Nothing marked on the plan yet');
+  toast('Building image…');
+  const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+  const colors = { cut: '#ef4444', fill: '#3b82f6', ok: '#16a34a' };
+  const R = Math.max(14, c.width / 260);
+  g.font = `bold ${Math.round(R * 1.5)}px Arial`; g.textBaseline = 'top'; g.textAlign = 'center';
+  const label = (txt, x, y, bg) => {
+    const w = g.measureText(txt).width + R;
+    g.fillStyle = bg; g.fillRect(x - w / 2, y, w, R * 2);
+    g.fillStyle = '#fff'; g.fillText(txt, x, y + R * .25);
+  };
+  for (const p of S.points) {
+    g.save(); g.translate(p.x, p.y); g.rotate(Math.PI / 4); g.fillStyle = '#f59e0b'; g.strokeStyle = '#fff'; g.lineWidth = R / 4;
+    g.fillRect(-R / 1.4, -R / 1.4, R * 1.4, R * 1.4); g.strokeRect(-R / 1.4, -R / 1.4, R * 1.4, R * 1.4); g.restore();
+  }
+  for (const s of S.shots) {
+    const r = compute(s.elev, s.offset, s.rod);
+    g.beginPath(); g.arc(s.x, s.y, R, 0, Math.PI * 2); g.fillStyle = colors[r.cls]; g.fill(); g.lineWidth = R / 4; g.strokeStyle = '#fff'; g.stroke();
+    label(`#${s.n} ${resultText(r)}`, s.x, s.y + R * 1.3, colors[r.cls]);
+  }
+  label(`${proj.name} · ${new Date().toLocaleString()} · HI ${f2(HI())}`, c.width / 2, R, '#111827');
+  c.toBlob(b => shareFile(b, `${proj.id}-grade-${stamp()}.jpg`), 'image/jpeg', .85);
+};
+$('#clearLog').onclick = function(){
+  if (this.dataset.armed && Date.now() - this.dataset.armed < 3000) {
+    S.shots = []; S.nextShot = 1; save(); renderPins(); renderLog(); this.textContent = 'Clear all shots'; delete this.dataset.armed; toast('Shots cleared');
+  } else { this.dataset.armed = Date.now(); this.textContent = 'Tap again to clear all shots'; setTimeout(() => { this.textContent = 'Clear all shots'; }, 3000); }
+};
+
+/* ---------- header / project ---------- */
+function updateHeader(){
+  $('#projName').textContent = proj.name;
+  $('#projSheet').textContent = (proj.sheet ? proj.sheet + ' · ' : '') + 'v' + VERSION;
+  const hi = HI();
+  $('#hiVal').textContent = isFinite(hi) ? f2(hi) : 'not set';
+  $('#hiVal').style.color = isFinite(hi) ? 'var(--accent)' : 'var(--cut)';
+}
+function loadProject(id){
+  proj = projects.find(p => p.id === id) || projects[0];
+  store.set('sg:last', proj.id);
+  const saved = store.get('sg:' + proj.id, null);
+  S = Object.assign(defaults(proj), saved || {});
+  if (!saved) save();
+  view.fitted = false;
+  img.onload = () => { fit(); renderPins(); };
+  img.src = proj.plan;
+  updateHeader(); updateHint(); renderPins();
+  if ($('#setupView').classList.contains('active')) renderSetup();
+}
+
+$('#verLbl').textContent = 'Site Grade v' + VERSION;
+window.addEventListener('resize', () => { if ($('#planView').classList.contains('active')) fit(); });
+
+fetch('projects.json', { cache: 'no-cache' }).then(r => r.json()).then(j => {
+  projects = j.projects;
+  loadProject(store.get('sg:last', projects[0].id));
+}).catch(() => { document.body.innerHTML = '<div class="pad"><h2>Could not load projects.json</h2><p class="muted">Open this once with a signal so it can be saved for offline use.</p></div>'; });
+
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>

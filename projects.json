@@ -1,0 +1,15 @@
+{
+  "projects": [
+    {
+      "id": "home2-douglasville",
+      "name": "Home 2 Suites Douglasville",
+      "sheet": "GP1 Grading Plan – HRC Job H22160 (Rev 5, 2/23/26)",
+      "plan": "plans/home2-douglasville-grading.jpg",
+      "planWidth": 4200,
+      "planHeight": 3243,
+      "elevPrefix": 1000,
+      "benchmark": { "name": "Slab F.F.E.", "elev": 1015.50 },
+      "points": []
+    }
+  ]
+}
