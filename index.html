@@ -313,7 +313,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = '1.2.0';
+const VERSION = '1.2.1';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
@@ -555,6 +555,7 @@ function openSheet(c){
   setOffset(src?.offset ?? 0);
   $('#shRod').value = existingShot ? c.shot.rod.toFixed(2) : '';
   liveCalc();
+  sheetOpenedAt = Date.now();
   $('#sheetBg').style.display = 'block';
   requestAnimationFrame(() => $('#sheet').classList.add('open'));
   setTimeout(() => {
@@ -563,7 +564,9 @@ function openSheet(c){
   }, 230);
 }
 function closeSheet(){ $('#sheet').classList.remove('open'); $('#sheetBg').style.display = 'none'; ctx = null; document.activeElement?.blur(); }
-$('#sheetBg').onclick = closeSheet; $('#shCancel').onclick = closeSheet;
+let sheetOpenedAt = 0;
+const ghostTap = () => Date.now() - sheetOpenedAt < 600; // touch screens send a 2nd 'click' after the tap that opened the sheet
+$('#sheetBg').onclick = () => { if (!ghostTap() && ctx) closeSheet(); }; $('#shCancel').onclick = closeSheet;
 
 function liveCalc(){
   const e = resolveElev($('#shElev').value);
@@ -894,6 +897,7 @@ $('#shotHere').onclick = () => {
 /* control point sheet + GPS capture */
 let curCp = null;
 const cap = { active: false, samples: [], timer: null };
+const GOOD_M = 8, MAX_M = 40; // phone GPS: ~5 m good, reject worse than ~130 ft
 function openCtl(cp){
   curCp = cp;
   $('#cpName').value = cp.name || '';
@@ -901,6 +905,8 @@ function openCtl(cp){
   $('#cpLon').value = isNum(cp.lon) ? cp.lon.toFixed(7) : '';
   $('#cpCapBox').style.display = 'none'; $('#cpCapture').textContent = 'Capture GPS here (20 sec)';
   if (isNum(cp.acc)) { $('#cpCapBox').style.display = 'block'; $('#cpCapBox').className = 'result'; $('#cpCapVal').textContent = 'Captured ±' + (cp.acc / M_PER_FT).toFixed(0) + ' ft'; $('#cpCapMsg').textContent = cp.n + ' readings averaged'; }
+  $('#cpDelete').textContent = 'Delete point'; delete $('#cpDelete').dataset.armed;
+  sheetOpenedAt = Date.now();
   $('#sheetBg').style.display = 'block';
   requestAnimationFrame(() => $('#ctlSheet').classList.add('open'));
 }
@@ -909,7 +915,7 @@ function closeCtl(){
   $('#ctlSheet').classList.remove('open'); $('#sheetBg').style.display = 'none'; curCp = null; document.activeElement?.blur();
 }
 $('#cpCancel').onclick = closeCtl;
-$('#sheetBg').addEventListener('click', () => { if (curCp) closeCtl(); });
+$('#sheetBg').addEventListener('click', () => { if (curCp && !ghostTap()) closeCtl(); });
 $('#cpSave').onclick = () => {
   const lat = num($('#cpLat').value), lon = num($('#cpLon').value);
   curCp.name = $('#cpName').value.trim() || curCp.name;
@@ -922,6 +928,7 @@ $('#cpMove').onclick = () => { pendingMove = curCp; closeCtl(); renderPins(); up
 $('#cpClearGps').onclick = () => { curCp.lat = curCp.lon = curCp.acc = curCp.n = null; $('#cpLat').value = $('#cpLon').value = ''; $('#cpCapBox').style.display = 'none'; save(); geoFit(); renderPins(); };
 $('#cpDelete').onclick = function(){
   if (this.dataset.armed && Date.now() - this.dataset.armed < 3000) {
+    if (!curCp) return closeCtl();
     S.geo = S.geo.filter(c => c !== curCp); delete this.dataset.armed; this.textContent = 'Delete point';
     save(); geoFit(); renderPins(); closeCtl(); toast('Control point deleted');
   } else { this.dataset.armed = Date.now(); this.textContent = 'Tap again to delete'; setTimeout(() => { this.textContent = 'Delete point'; }, 3000); }
@@ -940,10 +947,11 @@ $('#cpCapture').onclick = () => {
       if (cap.active) cap.samples.push({ lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, t: pos.timestamp });
     }, () => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
     const left = Math.max(0, 20 - Math.round((Date.now() - cap.start) / 1000));
-    const good = cap.samples.filter(x => x.acc <= 30);
-    const bestAcc = good.length ? Math.min(...good.map(x => x.acc)) : NaN;
+    const bestAcc = cap.samples.length ? Math.min(...cap.samples.map(x => x.acc)) : NaN;
     $('#cpCapVal').textContent = left + ' s';
-    $('#cpCapMsg').textContent = `${cap.samples.length} readings` + (isFinite(bestAcc) ? ` · best ±${(bestAcc / M_PER_FT).toFixed(0)} ft` : ' · waiting for signal');
+    $('#cpCapMsg').textContent = cap.samples.length
+      ? `${cap.samples.length} readings · best ±${(bestAcc / M_PER_FT).toFixed(0)} ft` + (bestAcc > GOOD_M ? ' (weak – step into the open)' : '')
+      : 'Waiting for GPS… (allow Location if asked)';
     if (left === 0) endCapture(true);
   }, 500);
 };
@@ -953,15 +961,17 @@ function endCapture(use){
   if (!gps.on && gps.watch != null) { navigator.geolocation.clearWatch(gps.watch); gps.watch = null; }
   $('#cpCapture').textContent = 'Capture GPS here (20 sec)';
   if (!use || !curCp) return;
-  const good = cap.samples.filter(x => x.acc <= 30);
-  const best = good.length ? Math.min(...good.map(x => x.acc)) : Infinity;
-  if (!(good.length >= 3 || best <= 10)) { $('#cpCapBox').className = 'result cut'; $('#cpCapVal').textContent = 'Not enough signal'; $('#cpCapMsg').textContent = 'Need a solid fix (under ±30 ft). Step away from the building/trees and try again.'; return; }
+  if (!cap.samples.length) { $('#cpCapBox').className = 'result cut'; $('#cpCapVal').textContent = 'No GPS readings'; $('#cpCapMsg').textContent = 'Check that Location is allowed for this site (iPhone: Settings → Privacy → Location Services → Safari, set "While Using" and Precise ON). Wi-Fi-only iPads have no GPS.'; return; }
+  const best = Math.min(...cap.samples.map(x => x.acc));
+  // keep the better half of readings (and anything within 2x of the best)
+  let good = cap.samples.filter(x => x.acc <= Math.max(best * 2, GOOD_M));
+  if (best > MAX_M) { $('#cpCapBox').className = 'result cut'; $('#cpCapVal').textContent = 'Signal too weak'; $('#cpCapMsg').textContent = `Best reading was ±${(best / M_PER_FT).toFixed(0)} ft. Step away from the building/trees, check Precise Location is on, and try again.`; return; }
   let wl = 0, wa = 0, wo = 0;
   for (const x of good) { const w = 1 / (x.acc * x.acc); wl += w; wa += x.lat * w; wo += x.lon * w; }
   const lat = wa / wl, lon = wo / wl, acc = avg(good.map(x => x.acc)) / Math.sqrt(Math.min(good.length, 4));
   curCp.lat = lat; curCp.lon = lon; curCp.acc = acc; curCp.n = good.length;
   $('#cpLat').value = lat.toFixed(7); $('#cpLon').value = lon.toFixed(7);
-  $('#cpCapBox').className = 'result ok'; $('#cpCapVal').textContent = 'Captured ±' + (acc / M_PER_FT).toFixed(0) + ' ft';
+  $('#cpCapBox').className = 'result ' + (best > GOOD_M ? 'fill' : 'ok'); $('#cpCapVal').textContent = 'Captured ±' + (acc / M_PER_FT).toFixed(0) + ' ft';
   $('#cpCapMsg').textContent = good.length + ' readings averaged · tap Save';
   save(); geoFit(); renderPins();
 }
