@@ -3,7 +3,7 @@
 Mobile web app for checking dirt grades with a rotating laser and a grade rod.
 Hosted on GitHub Pages; works offline after the first load.
 
-**Current version: v1.2.1**
+**Current version: v1.2.2**
 
 ## How it works
 1. **Setup** – shoot the benchmark (e.g. slab F.F.E.). App computes laser HI = BM elevation + rod reading.

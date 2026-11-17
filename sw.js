@@ -1,6 +1,6 @@
 // Site Grade service worker – lets the app open with no cell signal.
 // Bump CACHE when releasing a new version so phones pick up the update.
-const CACHE = 'site-grade-v1.2.1';
+const CACHE = 'site-grade-v1.2.2';
 const SHELL = [
   './',
   './index.html',

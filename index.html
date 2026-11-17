@@ -313,7 +313,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = '1.2.1';
+const VERSION = '1.2.2';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
@@ -464,10 +464,11 @@ $$('#modeSeg button').forEach(b => b.onclick = () => {
 function updateHint(){
   if (pendingMove) { $('#hint').textContent = `Tap the new spot for "${pendingMove.name || 'control point'}"`; return; }
   const near = gps.on && gps.plan ? nearestTarget() : null;
-  $('#hint').textContent = mode === 'cal' ? 'Tap a purple crosshair to capture GPS, or tap the plan to add one'
+  const gpsTxt = !gps.on ? '' : !gps.fix ? '📍 waiting for GPS… · ' : `📍 ±${Math.round(gps.fix.acc / M_PER_FT)} ft · `;
+  $('#hint').textContent = gpsTxt + (mode === 'cal' ? 'Tap a purple crosshair to capture GPS, or tap the plan to add one'
     : mode === 'point' ? 'Tap the plan to add a target point'
     : near ? `Nearest: ${near.p.name || 'point'} · ${Math.round(near.ft)} ft`
-    : (S.points.length ? 'Tap an orange point, or tap where you are standing' : 'Tap where you are standing to take a shot');
+    : (S.points.length ? 'Tap an orange point, or tap where you are standing' : 'Tap where you are standing to take a shot'));
   $('#noHiBanner').style.display = (mode === 'shoot' && !isFinite(HI())) ? 'block' : 'none';
 }
 
@@ -794,10 +795,18 @@ function geoFit(){
   }
   const tx = mp.x - (sr * mg.e - si * mg.n), ty = mp.y - (sr * mg.n + si * mg.e);
   gps.fit = { ref, sr, si, tx, ty, n: pts.length, fitScale };
+  autoGps();
   updateGpsDot();
   return gps.fit;
 }
 const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+// v1.2.2: once the plan is calibrated, show the dot automatically (no need to find the 📍 button)
+function autoGps(){
+  if (gps.on || gps.userOff || !gps.fit) return;
+  if (!startGps()) return;
+  gps.on = true; gps.follow = false; gps.centeredOnce = false;
+  updateGpsBtn();
+}
 function geoToPlan(lat, lon){
   const f = gps.fit; if (!f) return null;
   const g = toLocal(lat, lon, f.ref);
@@ -849,7 +858,7 @@ function stopGps(){
 }
 function onFix(pos){
   gps.fix = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, t: pos.timestamp };
-  if (cap.active) cap.samples.push(gps.fix);
+  if (cap.active && !cap.samples.some(x => x.t === gps.fix.t)) cap.samples.push({ ...gps.fix });
   if (gps.on) { updateGpsDot(); updateHint(); }
 }
 function updateGpsDot(){
@@ -859,7 +868,7 @@ function updateGpsDot(){
   dot.style.display = acc.style.display = 'block';
   dot.style.left = acc.style.left = q.x + 'px'; dot.style.top = acc.style.top = q.y + 'px';
   const d = 2 * gps.fix.acc * pxPerM(); acc.style.width = acc.style.height = d + 'px';
-  if (gps.follow) centerOn(q.x, q.y);
+  if (gps.follow || !gps.centeredOnce) { gps.centeredOnce = true; centerOn(q.x, q.y); }
 }
 function centerOn(x, y){
   view.x = planView.clientWidth / 2 - x * view.s; view.y = planView.clientHeight / 2 - y * view.s; apply();
@@ -872,13 +881,14 @@ function updateGpsBtn(){
 }
 $('#gpsBtn').onclick = () => {
   if (!gps.on) {
+    gps.userOff = false;
     if (!gps.fit) { toast('Capture GPS on at least 2 control points first (📍 Cal)'); mode = 'cal'; $$('#modeSeg button').forEach(x => x.classList.toggle('on', x.dataset.mode === 'cal')); renderPins(); updateHint(); return; }
     if (!startGps()) return;
     gps.on = true; gps.follow = true;
     if (view.s < 0.35) { const cx = planView.clientWidth / 2, cy = planView.clientHeight / 2; zoomAt(cx, cy, 0.5 / view.s); }
     toast('GPS on – following you');
   } else if (!gps.follow) { gps.follow = true; if (gps.plan) centerOn(gps.plan.x, gps.plan.y); }
-  else { stopGps(); toast('GPS off'); return; }
+  else { gps.userOff = true; stopGps(); toast('GPS off – tap 📍 to turn back on'); return; }
   updateGpsDot(); updateGpsBtn(); updateHint();
 };
 function nearestTarget(){
@@ -940,11 +950,14 @@ $('#cpCapture').onclick = () => {
   startGps();
   $('#cpCapBox').style.display = 'block'; $('#cpCapBox').className = 'result';
   $('#cpCapture').textContent = 'Stop and use readings';
-  let tick = 0;
+  let tick = 0, lastT = 0;
+  // seed with the live GPS reading if it's fresh (the dot may already be running)
+  if (gps.fix && Date.now() - gps.fix.t < 1500) { cap.samples.push({ ...gps.fix }); lastT = gps.fix.t; }
   cap.timer = setInterval(() => {
+    if (gps.fix && gps.fix.t !== lastT && gps.fix.t >= cap.start) { lastT = gps.fix.t; if (!cap.samples.some(x => x.t === gps.fix.t)) cap.samples.push({ ...gps.fix }); }
     // phones that are standing still may stop pushing updates – ask for a fresh fix every second
     if (++tick % 2 === 0) navigator.geolocation.getCurrentPosition(pos => {
-      if (cap.active) cap.samples.push({ lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, t: pos.timestamp });
+      if (cap.active && !cap.samples.some(x => x.t === pos.timestamp)) cap.samples.push({ lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, t: pos.timestamp });
     }, () => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
     const left = Math.max(0, 20 - Math.round((Date.now() - cap.start) / 1000));
     const bestAcc = cap.samples.length ? Math.min(...cap.samples.map(x => x.acc)) : NaN;
