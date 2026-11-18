@@ -62,6 +62,17 @@
   .fab.gps-on{background:#2563eb}
   .fab.gps-follow{background:#2563eb;box-shadow:0 0 0 3px #93c5fd}
   .fab.wide{width:auto;padding:0 12px;font-size:14px;font-weight:700}
+  #gradePanel{position:absolute;left:10px;right:10px;bottom:50px;background:rgba(17,24,31,.94);border:1px solid var(--line);border-radius:14px;
+    padding:10px 12px;color:#fff;display:none;box-shadow:0 4px 14px rgba(0,0,0,.35);max-width:520px;margin:0 auto}
+  #gradePanel .gp-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:14px;color:var(--muted)}
+  #gradePanel .gp-row b{color:#fff;font-size:17px;font-variant-numeric:tabular-nums}
+  #gradePanel .gp-big{font-size:38px;font-weight:900;text-align:center;margin:4px 0 2px;letter-spacing:.01em;font-variant-numeric:tabular-nums}
+  #gradePanel .gp-big.cut{color:#fca5a5} #gradePanel .gp-big.fill{color:#93c5fd} #gradePanel .gp-big.ok{color:#86efac}
+  #gradePanel .gp-sub{text-align:center;font-size:13px;color:var(--muted)}
+  #gradePanel .gp-warn{font-size:13px;color:#fde68a;text-align:center;margin-top:4px}
+  #gradePanel .gp-btns{display:flex;gap:8px;margin-top:8px}
+  #gradePanel .gp-btns button{flex:1;border:0;border-radius:10px;padding:11px 6px;font-weight:800;font-size:15px;background:var(--panel2);color:#fff;border:1px solid var(--line)}
+  #gradePanel .gp-btns button.pri{background:var(--accent);color:#111;border-color:var(--accent)}
   .resid{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:14px;margin-top:8px}
   .resid b{text-align:right;font-variant-numeric:tabular-nums}
   .switch{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:15px}
@@ -117,7 +128,7 @@
   th,td{padding:8px 6px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
   th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase}
   td:last-child{white-space:nowrap} td.c{color:#fca5a5;font-weight:800} td.f{color:#93c5fd;font-weight:800} td.k{color:#86efac;font-weight:800}
-  .toast{position:fixed;left:50%;bottom:calc(76px + var(--safe-b));transform:translateX(-50%);background:#0d141b;border:1px solid var(--accent);
+  .toast{position:fixed;left:50%;top:calc(128px + var(--safe-t));transform:translateX(-50%);background:#0d141b;border:1px solid var(--accent);
     color:#fff;padding:10px 16px;border-radius:12px;z-index:50;font-size:14px;display:none;max-width:90%}
   .ver{font-size:12px;color:var(--muted);text-align:center;margin-top:10px}
 </style>
@@ -154,6 +165,7 @@
     <div class="warn-banner" id="noHiBanner" style="display:none">
       Set up the laser first: go to <b>Setup</b> and shoot the benchmark.
     </div>
+    <div id="gradePanel"></div>
     <div class="hint" id="hint">Tap where you're standing to take a shot</div>
   </section>
 
@@ -189,6 +201,15 @@
         <input id="chkRod" type="text" inputmode="decimal" placeholder="4.50">
         <div class="result" id="chkResult" style="display:none"><div class="rv" id="chkVal"></div><div class="rs" id="chkMsg"></div></div>
         <button class="btn ghost" id="chkBtn">Check</button>
+      </div>
+
+      <div class="card">
+        <h2>GPS elevation (RTK rover)</h2>
+        <div class="muted">With an RTK rover feeding the tablet, Site Grade reads elevation as you walk – no laser or rod reading. Calibrate once on a known elevation (the slab), then the Plan tab shows live CUT/FILL.</div>
+        <div id="gElevStatus" class="resid"></div>
+        <button class="btn sm" id="gCalBtn">Calibrate on benchmark</button>
+        <button class="btn ghost sm" id="gClearBtn">Clear elevation calibration</button>
+        <div class="note">Keep the pole the same height after calibrating (and the same Instrument Height in GNSS Master) – the calibration cancels the pole height and the GPS height datum. Re-calibrate if you change either.</div>
       </div>
 
       <div class="card">
@@ -310,10 +331,23 @@
   <button class="btn danger sm" id="cpDelete">Delete point</button>
 </div>
 
+<div class="sheet" id="calSheet">
+  <div class="grab"></div>
+  <h3>Calibrate GPS elevation</h3>
+  <div class="muted">Set the pole tip on a point of known elevation (finished slab is best), hold it plumb, then tap Start.</div>
+  <label>Benchmark</label>
+  <input id="calName" type="text" placeholder="Slab F.F.E.">
+  <label>Benchmark elevation (ft)</label>
+  <input id="calElev" type="text" inputmode="decimal" placeholder="1015.50">
+  <div class="result" id="calBox" style="display:none"><div class="rv" id="calVal" style="font-size:28px"></div><div class="rs" id="calMsg"></div></div>
+  <button class="btn" id="calStart">Start (5 sec)</button>
+  <button class="btn ghost" id="calClose">Close</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = '1.2.2';
+const VERSION = '1.3.0';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
@@ -333,6 +367,7 @@ const defaults = p => ({
   points: (p.points || []).map(x => ({...x})),
   geo: (p.control || []).map(x => ({...x})),
   useScale: !!p.planFtPerPx,
+  gElev: null, gTarget: null, gAuto: true,
   shots: [],
   nextShot: 1
 });
@@ -367,6 +402,15 @@ function compute(planElev, offsetIn, rod){
   if (diff > S.tol + 1e-9) cls = 'cut'; else if (diff < -S.tol - 1e-9) cls = 'fill';
   return { hi, target, actual, diff, rodTarget, cls };
 }
+// a saved shot's result – laser shots use HI − rod, GPS shots store the measured ground elevation
+function shotResult(s){
+  if (s.src === 'gps') {
+    const target = s.elev - (s.offset || 0) / 12, diff = s.actual - target;
+    let cls = 'ok'; if (diff > S.tol + 1e-9) cls = 'cut'; else if (diff < -S.tol - 1e-9) cls = 'fill';
+    return { hi: NaN, target, actual: s.actual, diff, rodTarget: NaN, cls };
+  }
+  return compute(s.elev, s.offset, s.rod);
+}
 function resultText(r){
   if (!isFinite(r.diff)) return '—';
   if (r.cls === 'ok') return 'ON GRADE';
@@ -385,6 +429,7 @@ function showView(id){
   if (id === 'planView') { requestAnimationFrame(() => { if (!view.fitted) fit(); }); }
   if (id === 'logView') renderLog();
   if (id === 'setupView') renderSetup();
+  renderGrade(true);
 }
 
 /* ---------- plan pan / zoom ---------- */
@@ -459,7 +504,7 @@ let mode = 'shoot';
 $$('#modeSeg button').forEach(b => b.onclick = () => {
   mode = b.dataset.mode;
   $$('#modeSeg button').forEach(x => x.classList.toggle('on', x === b));
-  pendingMove = null; renderPins(); updateHint();
+  pendingMove = null; renderPins(); updateHint(); renderGrade(true);
 });
 function updateHint(){
   if (pendingMove) { $('#hint').textContent = `Tap the new spot for "${pendingMove.name || 'control point'}"`; return; }
@@ -512,7 +557,8 @@ function renderPins(){
     html.push(`<div class="pin target" style="left:${p.x}px;top:${p.y}px"><div class="dot"></div><div class="lbl">${esc(p.name || 'Pt')} · ${f2(p.elev)}${p.offset ? ' −' + p.offset + '"' : ''}</div></div>`);
   }
   for (const s of S.shots) {
-    const r = compute(s.elev, s.offset, s.rod);
+    if (!isNum(s.x) || !isNum(s.y)) continue;
+    const r = shotResult(s);
     html.push(`<div class="pin ${r.cls}" style="left:${s.x}px;top:${s.y}px"><div class="dot"></div><div class="lbl">${resultText(r)}</div></div>`);
   }
   $('#pins').innerHTML = html.join('');
@@ -539,28 +585,32 @@ function openSheet(c){
   ctx = c;
   renderChips();
   const isPoint = c.kind === 'point';
+  const isGTarget = c.kind === 'gtarget';
   const existingShot = c.kind === 'shot' && c.shot;
+  const gpsShot = existingShot && c.shot.src === 'gps';
   const existingPt = isPoint && c.point;
-  $('#shTitle').textContent = isPoint ? (existingPt ? 'Edit target point' : 'New target point')
+  $('#shTitle').textContent = isGTarget ? 'GPS grade target' : isPoint ? (existingPt ? 'Edit target point' : 'New target point')
                             : existingShot ? `Shot #${c.shot.n}` : (c.from ? `Shoot: ${c.from.name || 'point'}` : 'New shot');
-  $('#shSub').textContent = isPoint ? 'Saved on this phone. The super taps it later and only enters the rod reading.'
+  $('#shSub').textContent = isGTarget ? 'What grade should the dirt be here? Live CUT/FILL compares the rover to this.'
+                         : gpsShot ? `GPS shot · ${new Date(c.shot.time).toLocaleString()} · ground ${f2(c.shot.actual)}`
+                         : isPoint ? 'Saved on this phone. The super taps it later and only enters the rod reading.'
                          : existingShot ? new Date(c.shot.time).toLocaleString() : (isFinite(HI()) ? 'Laser HI ' + f2(HI()) : '⚠ Laser not set up – go to Setup first');
-  $('#shRodWrap').style.display = isPoint ? 'none' : 'block';
-  $('#shSave').textContent = isPoint ? 'Save point' : existingShot ? 'Update shot' : 'Save shot';
+  $('#shRodWrap').style.display = (isPoint || isGTarget || gpsShot) ? 'none' : 'block';
+  $('#shSave').textContent = isGTarget ? 'Use this target' : isPoint ? 'Save point' : existingShot ? 'Update shot' : 'Save shot';
   $('#shDelete').style.display = (existingShot || existingPt) ? 'block' : 'none';
 
-  const src = existingShot ? c.shot : existingPt ? c.point : c.from || null;
+  const src = isGTarget ? (S.gTarget || null) : existingShot ? c.shot : existingPt ? c.point : c.from || null;
   $('#shName').value = src?.name || '';
   $('#shName').placeholder = isPoint ? 'e.g. Curb NE corner' : 'Optional – e.g. pad SW';
   $('#shElev').value = src && isFinite(src.elev) ? src.elev.toFixed(2) : '';
   setOffset(src?.offset ?? 0);
-  $('#shRod').value = existingShot ? c.shot.rod.toFixed(2) : '';
+  $('#shRod').value = existingShot && isNum(c.shot.rod) ? c.shot.rod.toFixed(2) : '';
   liveCalc();
   sheetOpenedAt = Date.now();
   $('#sheetBg').style.display = 'block';
   requestAnimationFrame(() => $('#sheet').classList.add('open'));
   setTimeout(() => {
-    const focusEl = (c.from || existingShot) ? $('#shRod') : isPoint ? $('#shName') : $('#shElev');
+    const focusEl = (isGTarget || gpsShot) ? $('#shElev') : (c.from || existingShot) ? $('#shRod') : isPoint ? $('#shName') : $('#shElev');
     focusEl.focus({ preventScroll: true });
   }, 230);
 }
@@ -572,7 +622,7 @@ $('#sheetBg').onclick = () => { if (!ghostTap() && ctx) closeSheet(); }; $('#shC
 function liveCalc(){
   const e = resolveElev($('#shElev').value);
   $('#shElevResolved').textContent = (isFinite(e) && num($('#shElev').value) < 100) ? '= ' + f2(e) : '';
-  if (ctx?.kind === 'point') return;
+  if (ctx?.kind === 'point' || ctx?.kind === 'gtarget' || ctx?.shot?.src === 'gps') return;
   const rod = num($('#shRod').value), box = $('#shResult');
   box.className = 'result';
   if (!isFinite(HI())) { $('#shRv').textContent = 'No HI'; $('#shRs').textContent = 'Shoot the benchmark in Setup first'; $('#shCalc').innerHTML = ''; return; }
@@ -606,6 +656,14 @@ $('#shSave').onclick = () => {
     if (ctx.point) Object.assign(ctx.point, { name, elev: e, offset: curOffset });
     else S.points.push({ id: 'p' + Date.now(), name, elev: e, offset: curOffset, x: Math.round(ctx.x), y: Math.round(ctx.y) });
     save(); renderPins(); closeSheet(); updateHint(); toast('Point saved'); return;
+  }
+  if (ctx.kind === 'gtarget') {
+    S.gTarget = { name, elev: e, offset: curOffset }; S.gAuto = false;
+    save(); closeSheet(); renderGrade(true); toast('Target set – ' + f2(e - curOffset / 12) + ' dirt'); return;
+  }
+  if (ctx.shot && ctx.shot.src === 'gps') {
+    Object.assign(ctx.shot, { name, elev: e, offset: curOffset });
+    save(); renderPins(); closeSheet(); toast('Shot updated – ' + resultText(shotResult(ctx.shot))); return;
   }
   if (!isFinite(HI())) return toast('Set up the laser first (Setup tab)');
   const rod = num($('#shRod').value);
@@ -643,7 +701,7 @@ function renderSetup(){
   $('#ptCount').textContent = `${S.points.length} target point${S.points.length === 1 ? '' : 's'} on this project.`;
   $('#chkResult').style.display = 'none'; $('#chkRod').value = '';
   $('#useScale').checked = !!S.useScale; $('#useScale').disabled = !proj.planFtPerPx;
-  renderGeoStatus();
+  renderGeoStatus(); renderGElevStatus();
   setupCalc();
 }
 function setupCalc(){
@@ -701,23 +759,25 @@ $('#importPts').onchange = async e => {
 /* ---------- log ---------- */
 function renderLog(){
   const rows = [...S.shots].reverse().map(s => {
-    const r = compute(s.elev, s.offset, s.rod);
+    const r = shotResult(s);
     const c = r.cls === 'cut' ? 'c' : r.cls === 'fill' ? 'f' : 'k';
     return `<tr><td>${s.n}</td><td>${new Date(s.time).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</td>
-      <td>${esc(s.name || '')}</td><td>${f2(r.target)}</td><td>${f2(s.rod)}</td><td class="${c}">${resultText(r)}</td></tr>`;
+      <td>${esc(s.name || '')}</td><td>${f2(r.target)}</td><td>${s.src === 'gps' ? 'GPS ' + f2(s.actual) : f2(s.rod)}</td><td class="${c}">${resultText(r)}</td></tr>`;
   });
   $('#logBody').innerHTML = rows.join('') || '<tr><td colspan="6" class="muted">No shots yet.</td></tr>';
-  const cut = S.shots.filter(s => compute(s.elev, s.offset, s.rod).cls === 'cut').length;
-  const fill = S.shots.filter(s => compute(s.elev, s.offset, s.rod).cls === 'fill').length;
+  const cut = S.shots.filter(s => shotResult(s).cls === 'cut').length;
+  const fill = S.shots.filter(s => shotResult(s).cls === 'fill').length;
   $('#logSummary').textContent = `${S.shots.length} shots · ${cut} cut · ${fill} fill · ${S.shots.length - cut - fill} on grade (±${S.tol.toFixed(2)}')`;
 }
 function csv(){
-  const head = ['Shot', 'Date', 'Time', 'Point', 'Plan Elev', 'Offset (in)', 'Target Dirt', 'Laser HI', 'Rod', 'Actual Dirt', 'Cut(+)/Fill(-) ft', 'Result', 'Plan X', 'Plan Y'];
+  const head = ['Shot', 'Date', 'Time', 'Method', 'Point', 'Plan Elev', 'Offset (in)', 'Target Dirt', 'Laser HI', 'Rod', 'Actual Dirt', 'Cut(+)/Fill(-) ft', 'Result', 'Plan X', 'Plan Y', 'Lat', 'Lon', 'GPS H Acc (ft)'];
   const lines = [head.join(',')];
   for (const s of S.shots) {
-    const r = compute(s.elev, s.offset, s.rod), d = new Date(s.time);
-    lines.push([s.n, d.toLocaleDateString(), d.toLocaleTimeString(), `"${(s.name || '').replace(/"/g, '""')}"`, f2(s.elev), s.offset || 0,
-      f2(r.target), f2(r.hi), f2(s.rod), f2(r.actual), r.diff.toFixed(3), resultText(r), s.x, s.y].join(','));
+    const r = shotResult(s), d = new Date(s.time);
+    lines.push([s.n, d.toLocaleDateString(), d.toLocaleTimeString(), s.src === 'gps' ? 'GPS' : 'Laser', `"${(s.name || '').replace(/"/g, '""')}"`, f2(s.elev), s.offset || 0,
+      f2(r.target), s.src === 'gps' ? '' : f2(r.hi), s.src === 'gps' ? '' : f2(s.rod), f2(r.actual), r.diff.toFixed(3), resultText(r),
+      isNum(s.x) ? s.x : '', isNum(s.y) ? s.y : '', isNum(s.lat) ? s.lat.toFixed(8) : '', isNum(s.lon) ? s.lon.toFixed(8) : '',
+      isNum(s.hacc) ? (s.hacc / 0.3048).toFixed(2) : ''].join(','));
   }
   return lines.join('\n');
 }
@@ -749,7 +809,8 @@ $('#sharePlan').onclick = () => {
     g.fillRect(-R / 1.4, -R / 1.4, R * 1.4, R * 1.4); g.strokeRect(-R / 1.4, -R / 1.4, R * 1.4, R * 1.4); g.restore();
   }
   for (const s of S.shots) {
-    const r = compute(s.elev, s.offset, s.rod);
+    if (!isNum(s.x) || !isNum(s.y)) continue;
+    const r = shotResult(s);
     g.beginPath(); g.arc(s.x, s.y, R, 0, Math.PI * 2); g.fillStyle = colors[r.cls]; g.fill(); g.lineWidth = R / 4; g.strokeStyle = '#fff'; g.stroke();
     label(`#${s.n} ${resultText(r)}`, s.x, s.y + R * 1.3, colors[r.cls]);
   }
@@ -765,7 +826,7 @@ $('#clearLog').onclick = function(){
 
 /* ---------- GPS on the plan (v1.2) ---------- */
 let pendingMove = null;
-const gps = { on: false, follow: false, watch: null, fix: null, plan: null, fit: null };
+const gps = { on: false, follow: false, watch: null, fix: null, plan: null, fit: null, altBuf: [] };
 const M_PER_FT = 0.3048;
 
 // local flat-earth meters around a reference lat/lon (fine over a few hundred feet)
@@ -854,10 +915,17 @@ function startGps(){
 }
 function stopGps(){
   if (gps.watch != null && !cap.active) { navigator.geolocation.clearWatch(gps.watch); gps.watch = null; }
-  gps.on = false; gps.follow = false; gps.plan = null; updateGpsDot(); updateGpsBtn(); updateHint();
+  gps.on = false; gps.follow = false; gps.plan = null; updateGpsDot(); updateGpsBtn(); updateHint(); renderGrade(true);
 }
 function onFix(pos){
-  gps.fix = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, t: pos.timestamp };
+  gps.fix = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, t: pos.timestamp,
+              alt: isNum(pos.coords.altitude) ? pos.coords.altitude : null, altAcc: isNum(pos.coords.altitudeAccuracy) ? pos.coords.altitudeAccuracy : null };
+  if (isNum(gps.fix.alt)) {
+    gps.altBuf.push({ t: Date.now(), alt: gps.fix.alt });
+    while (gps.altBuf.length && Date.now() - gps.altBuf[0].t > 3000) gps.altBuf.shift();
+    if (cal.active) cal.samples.push(gps.fix.alt);
+  }
+  renderGrade();
   if (cap.active && !cap.samples.some(x => x.t === gps.fix.t)) cap.samples.push({ ...gps.fix });
   if (gps.on) { updateGpsDot(); updateHint(); }
 }
@@ -989,13 +1057,153 @@ function endCapture(use){
   save(); geoFit(); renderPins();
 }
 
+
+/* ---------- GPS elevation (v1.3) ---------- */
+const FT = 3.28084;
+const cal = { active: false, samples: [], timer: null, open: false };
+// ground elevation (ft, plan datum) = GPS altitude (m) × 3.28084 + calibration offset
+function liveAltM(){
+  if (!gps.altBuf.length) return NaN;
+  return avg(gps.altBuf.map(x => x.alt)); // ~3 s smoothing
+}
+function groundFt(){
+  if (!S.gElev || !isNum(S.gElev.offsetFt)) return NaN;
+  const a = liveAltM(); return isNum(a) ? a * FT + S.gElev.offsetFt : NaN;
+}
+// target: nearest orange target point within 10 ft (auto), otherwise the one the super typed in
+function activeTarget(){
+  if (S.gAuto !== false) {
+    const n = gps.plan ? nearestTarget() : null;
+    if (n && n.ft <= 10) return { name: n.p.name || 'point', elev: n.p.elev, offset: n.p.offset || 0, auto: true, ft: n.ft };
+  }
+  return S.gTarget || null;
+}
+function quality(){
+  const f = gps.fix; if (!f) return { lvl: 'none', txt: 'Waiting for GPS…' };
+  if (f.acc <= 0.1) return { lvl: 'rtk', txt: '' };
+  if (f.acc <= 0.6) return { lvl: 'float', txt: `GPS ±${(f.acc * FT * 12).toFixed(0)}" – not RTK Fixed, elevations may be off` };
+  return { lvl: 'gps', txt: `GPS ±${(f.acc * FT).toFixed(0)} ft – no RTK fix, don't trust elevations` };
+}
+let lastGradeDraw = 0;
+function renderGrade(force){
+  const el = $('#gradePanel');
+  const show = gps.on && mode === 'shoot' && $('#planView').classList.contains('active');
+  if (!show) { el.style.display = 'none'; return; }
+  if (!force && Date.now() - lastGradeDraw < 250) return; lastGradeDraw = Date.now();
+  updateHeader();
+  el.style.display = 'block';
+  const q = quality();
+  if (gps.fix && !isNum(gps.fix.alt)) {
+    el.innerHTML = `<div class="gp-sub">GPS has no elevation. With an RTK rover, make sure GNSS Master's Mock Location is on.</div>`;
+    return;
+  }
+  if (!S.gElev) {
+    el.innerHTML = `<div class="gp-sub">Elevation not calibrated yet</div>
+      <div class="gp-btns"><button class="pri" id="gpCal">Calibrate on slab</button></div>
+      ${q.txt ? `<div class="gp-warn">${q.txt}</div>` : ''}`;
+    $('#gpCal').onclick = openCal; return;
+  }
+  const g = groundFt(), t = activeTarget();
+  let big = '—', cls = '', sub = 'Set a target grade to see CUT/FILL';
+  if (t && isNum(g)) {
+    const tgt = t.elev - (t.offset || 0) / 12, d = g - tgt;
+    cls = d > S.tol + 1e-9 ? 'cut' : d < -S.tol - 1e-9 ? 'fill' : 'ok';
+    big = cls === 'ok' ? 'ON GRADE' : (cls === 'cut' ? 'CUT ' : 'FILL ') + Math.abs(d).toFixed(2) + "'";
+    sub = `${cls === 'ok' ? '' : toInches(d) + ' · '}target dirt ${f2(tgt)}${t.auto ? ` · ${esc(t.name)} (${Math.round(t.ft)} ft away)` : ''}`;
+  }
+  el.innerHTML = `
+    <div class="gp-row"><span>Ground</span><b>${isNum(g) ? f2(g) : '—'}</b>
+      <span>Target</span><b>${t ? f2(t.elev) + (t.offset ? ` −${t.offset}"` : '') : '—'}</b></div>
+    <div class="gp-big ${cls}">${big}</div>
+    <div class="gp-sub">${sub}</div>
+    ${q.txt ? `<div class="gp-warn">⚠ ${q.txt}</div>` : ''}
+    <div class="gp-btns"><button id="gpTarget">${t ? 'Change target' : 'Set target'}</button><button class="pri" id="gpRec">Record shot</button></div>`;
+  $('#gpTarget').onclick = () => openSheet({ kind: 'gtarget' });
+  $('#gpRec').onclick = recordGpsShot;
+}
+function recordGpsShot(){
+  const g = groundFt(), t = activeTarget();
+  if (!isNum(g)) return toast('No GPS elevation yet');
+  if (!t) return openSheet({ kind: 'gtarget' });
+  const q = quality();
+  const shot = { n: S.nextShot++, time: Date.now(), src: 'gps', name: t.name || '', elev: t.elev, offset: t.offset || 0,
+    actual: Math.round(g * 1000) / 1000, x: gps.plan ? Math.round(gps.plan.x) : null, y: gps.plan ? Math.round(gps.plan.y) : null,
+    lat: gps.fix.lat, lon: gps.fix.lon, hacc: gps.fix.acc, quality: q.lvl };
+  S.shots.push(shot); save(); renderPins();
+  toast(`Shot #${shot.n} – ${resultText(shotResult(shot))}${q.lvl !== 'rtk' ? ' (not RTK fixed)' : ''}`);
+}
+function renderGElevStatus(){
+  const el = $('#gElevStatus'); if (!el) return;
+  let h = '';
+  if (S.gElev) {
+    h += `<span>Calibrated on</span><b>${esc(S.gElev.bmName)} ${f2(S.gElev.bmElev)}</b>`;
+    h += `<span>When</span><b>${new Date(S.gElev.time).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</b>`;
+    h += `<span>Readings averaged</span><b>${S.gElev.n}</b>`;
+  } else h += `<span style="grid-column:1/3;color:var(--target)">Not calibrated – set the rover on the slab and tap Calibrate.</span>`;
+  const f = gps.fix;
+  h += `<span>Live GPS</span><b>${!f ? 'off / waiting' : isNum(f.alt) ? '±' + (f.acc * FT * 12).toFixed(1) + '" horiz' : 'no elevation'}</b>`;
+  el.innerHTML = h;
+}
+function openCal(){
+  if (!gps.on) { if (!startGps()) return; gps.on = true; gps.follow = false; gps.userOff = false; updateGpsBtn(); }
+  $('#calName').value = S.gElev?.bmName || S.bm.name || 'Slab F.F.E.';
+  const e = S.gElev?.bmElev ?? S.bm.elev;
+  $('#calElev').value = isNum(e) ? e.toFixed(2) : '';
+  $('#calBox').style.display = 'none'; $('#calStart').textContent = 'Start (5 sec)';
+  sheetOpenedAt = Date.now(); $('#sheetBg').style.display = 'block'; cal.open = true;
+  requestAnimationFrame(() => $('#calSheet').classList.add('open'));
+}
+function closeCal(){
+  clearInterval(cal.timer); cal.active = false; cal.open = false;
+  $('#calSheet').classList.remove('open'); $('#sheetBg').style.display = 'none'; document.activeElement?.blur();
+  renderGrade(true);
+}
+$('#calClose').onclick = closeCal;
+$('#sheetBg').addEventListener('click', () => { if (cal.open && !ghostTap()) closeCal(); });
+$('#gCalBtn').onclick = openCal;
+$('#gClearBtn').onclick = function(){
+  if (this.dataset.armed && Date.now() - this.dataset.armed < 3000) {
+    S.gElev = null; save(); renderGElevStatus(); renderGrade(true); this.textContent = 'Clear elevation calibration'; delete this.dataset.armed; toast('Elevation calibration cleared');
+  } else { this.dataset.armed = Date.now(); this.textContent = 'Tap again to clear'; setTimeout(() => { this.textContent = 'Clear elevation calibration'; }, 3000); }
+};
+$('#calStart').onclick = () => {
+  const bm = resolveElev($('#calElev').value);
+  if (!isNum(bm)) return toast('Enter the benchmark elevation');
+  if (cal.active) return;
+  cal.active = true; cal.samples = []; const t0 = Date.now();
+  if (gps.fix && isNum(gps.fix.alt) && Date.now() - gps.fix.t < 1500) cal.samples.push(gps.fix.alt);
+  $('#calBox').style.display = 'block'; $('#calBox').className = 'result'; $('#calStart').textContent = 'Measuring…';
+  let tick = 0, lastT = gps.fix ? gps.fix.t : 0;
+  cal.timer = setInterval(() => {
+    // phones standing still may not push updates – use fresh live fixes and poll
+    if (gps.fix && gps.fix.t !== lastT && isNum(gps.fix.alt)) { lastT = gps.fix.t; cal.samples.push(gps.fix.alt); }
+    if (++tick % 2 === 0) navigator.geolocation.getCurrentPosition(pos => { if (cal.active && isNum(pos.coords.altitude) && pos.timestamp !== lastT) { lastT = pos.timestamp; cal.samples.push(pos.coords.altitude); } }, () => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 4000 });
+    const left = Math.max(0, 5 - Math.round((Date.now() - t0) / 1000));
+    $('#calVal').textContent = left + ' s'; $('#calMsg').textContent = `${cal.samples.length} readings`;
+    if (left > 0) return;
+    clearInterval(cal.timer); cal.active = false; $('#calStart').textContent = 'Start (5 sec)';
+    if (!cal.samples.length) { $('#calBox').className = 'result cut'; $('#calVal').textContent = 'No elevation'; $('#calMsg').textContent = 'The tablet isn’t getting elevation from the rover. Check GNSS Master is running with Mock Location on.'; return; }
+    const altM = avg(cal.samples), spreadIn = (Math.max(...cal.samples) - Math.min(...cal.samples)) * FT * 12;
+    S.gElev = { offsetFt: bm - altM * FT, bmName: $('#calName').value.trim() || 'Benchmark', bmElev: bm, time: Date.now(), n: cal.samples.length };
+    gps.altBuf = cal.samples.slice(-3).map(a => ({ t: Date.now(), alt: a }));
+    save(); renderGElevStatus(); renderGrade(true);
+    const q = quality();
+    $('#calBox').className = 'result ' + (q.lvl === 'rtk' ? 'ok' : 'fill');
+    $('#calVal').textContent = 'Calibrated ✓';
+    $('#calMsg').textContent = `${cal.samples.length} readings · spread ${spreadIn.toFixed(1)}"` + (q.lvl !== 'rtk' ? ' · ⚠ not RTK fixed – recalibrate once fixed' : '');
+  }, 500);
+};
 /* ---------- header / project ---------- */
 function updateHeader(){
   $('#projName').textContent = proj.name;
   $('#projSheet').textContent = (proj.sheet ? proj.sheet + ' · ' : '') + 'v' + VERSION;
   const hi = HI();
-  $('#hiVal').textContent = isFinite(hi) ? f2(hi) : 'not set';
-  $('#hiVal').style.color = isFinite(hi) ? 'var(--accent)' : 'var(--cut)';
+  // GPS elevation mode: show the live ground elevation instead of the laser HI
+  const g = (gps.on && S.gElev) ? groundFt() : NaN;
+  if (isNum(g)) { $('#hiVal').textContent = f2(g); $('#hiVal').style.color = '#93c5fd'; $('#hiBadge span').textContent = 'GPS ground'; return; }
+  $('#hiBadge span').textContent = 'Laser HI';
+  $('#hiVal').textContent = isFinite(hi) ? f2(hi) : (S.gElev ? 'GPS ready' : 'not set');
+  $('#hiVal').style.color = isFinite(hi) ? 'var(--accent)' : S.gElev ? '#93c5fd' : 'var(--cut)';
 }
 function loadProject(id){
   proj = projects.find(p => p.id === id) || projects[0];

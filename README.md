@@ -3,7 +3,7 @@
 Mobile web app for checking dirt grades with a rotating laser and a grade rod.
 Hosted on GitHub Pages; works offline after the first load.
 
-**Current version: v1.2.2**
+**Current version: v1.3.0**
 
 ## How it works
 1. **Setup** – shoot the benchmark (e.g. slab F.F.E.). App computes laser HI = BM elevation + rod reading.
@@ -14,6 +14,14 @@ Hosted on GitHub Pages; works offline after the first load.
 Math: target dirt = plan elev − offset; actual dirt = HI − rod; cut(+)/fill(−) = actual − target.
 
 Spot elevations can be typed short (`14.33` → `1014.33`) using the project's elevation prefix.
+
+## GPS elevation (v1.3) – RTK rover
+- Rover (LG290P + GNSS Master mock location) feeds position **and elevation** to the tablet.
+- Setup → **Calibrate on benchmark** (or the panel's *Calibrate on slab*): pole on the slab F.F.E., 5 s average.
+  Offset = benchmark − GPS height, so pole height and ellipsoid/geoid difference cancel. Keep pole height fixed afterward.
+- Plan tab (Shoot mode, GPS on): live **Ground** elevation and **CUT/FILL** vs. the target.
+- Target = nearest orange target point within 10 ft (automatic) or one you type (*Set target*: plan elevation + offset).
+- **Record shot** saves a GPS shot (pin, log, CSV with lat/long and accuracy). Warns when not RTK Fixed.
 
 ## GPS on the plan (v1.2)
 - Control points (purple crosshairs, **📍 Cal** mode) tie the plan to GPS. Defaults: the 4 building corners.
