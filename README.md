@@ -3,7 +3,7 @@
 Mobile web app for checking dirt grades with a rotating laser and a grade rod.
 Hosted on GitHub Pages; works offline after the first load.
 
-**Current version: v1.3.1**
+**Current version: v1.4.0**
 
 ## How it works
 1. **Setup** – shoot the benchmark (e.g. slab F.F.E.). App computes laser HI = BM elevation + rod reading.
@@ -14,6 +14,13 @@ Hosted on GitHub Pages; works offline after the first load.
 Math: target dirt = plan elev − offset; actual dirt = HI − rod; cut(+)/fill(−) = actual − target.
 
 Spot elevations can be typed short (`14.33` → `1014.33`) using the project's elevation prefix.
+
+## Projects (v1.4)
+- **Home 2 Suites Douglasville** – GP1 grading plan, slab F.F.E. 1015.50.
+- **WoodSpring Suites Douglasville** (690 McPherson Rd, HE-2325) – C-2 grading plan, F.F.E. 941.00, elevation prefix 900.
+  65 target points pre-loaded from the stamped PDF: 55 curb/pavement spot grades, 7 inlet/structure tops, 3 retaining-wall bottoms.
+  Points were read off a scanned PDF – positions are within a few feet; check any that matter against the plan.
+- Projects live in `projects.json`; pick one in Setup → Project. Shots, captures and calibration stay on each device.
 
 ## GPS elevation (v1.3) – RTK rover
 - Rover (LG290P + GNSS Master mock location) feeds position **and elevation** to the tablet.

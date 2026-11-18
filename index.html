@@ -48,6 +48,7 @@
     box-shadow:0 1px 3px rgba(0,0,0,.4)}
   .pin.target .dot{border-radius:3px;background:var(--target);transform:rotate(45deg)}
   .pin.target .lbl{background:#92400e}
+  .far .pin.target .lbl{display:none}
   .pin.cut .dot,.pin.cut .lbl{background:var(--cut)}
   .pin.fill .dot,.pin.fill .lbl{background:var(--fill)}
   .pin.ok .dot,.pin.ok .lbl{background:var(--ok)}
@@ -347,7 +348,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = '1.3.1';
+const VERSION = '1.4.0';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
@@ -438,7 +439,10 @@ const view = { s: 1, x: 0, y: 0, min: .05, max: 4, fitted: false };
 function apply(){
   stage.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.s})`;
   stage.style.setProperty('--inv', 1 / view.s);
+  // zoomed out: hide target-point labels so the plan isn't buried (labels show again as you zoom in)
+  stage.classList.toggle('far', view.s / ftPerPxSafe() < 2.5); // screen px per foot
 }
+function ftPerPxSafe(){ try { return ftPerPx() || 0.15; } catch(e){ return 0.15; } }
 function fit(){
   const W = planView.clientWidth, H = planView.clientHeight;
   if (!W || !img.naturalWidth) return;
@@ -554,7 +558,7 @@ function renderPins(){
     html.push(`<div class="pin ctl ${ok ? 'set' : ''}" style="left:${c.x}px;top:${c.y}px"><div class="dot"></div><div class="lbl">${esc(c.name.replace(/^Bldg /, ''))} ${ok ? '✓' : '○'}</div></div>`);
   }
   for (const p of S.points) {
-    html.push(`<div class="pin target" style="left:${p.x}px;top:${p.y}px"><div class="dot"></div><div class="lbl">${esc(p.name || 'Pt')} · ${f2(p.elev)}${p.offset ? ' −' + p.offset + '"' : ''}</div></div>`);
+    html.push(`<div class="pin target" style="left:${p.x}px;top:${p.y}px"><div class="dot"></div><div class="lbl">${p.name && !/^Spot\b/.test(p.name) ? esc(p.name) + ' · ' : ''}${f2(p.elev)}${p.offset ? ' −' + p.offset + '"' : ''}</div></div>`);
   }
   for (const s of S.shots) {
     if (!isNum(s.x) || !isNum(s.y)) continue;

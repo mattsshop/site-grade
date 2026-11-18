@@ -3,20 +3,621 @@
     {
       "id": "home2-douglasville",
       "name": "Home 2 Suites Douglasville",
-      "sheet": "GP1 Grading Plan – HRC Job H22160 (Rev 5, 2/23/26)",
+      "sheet": "GP1 Grading Plan \u2013 HRC Job H22160 (Rev 5, 2/23/26)",
       "plan": "plans/home2-douglasville-grading.jpg",
       "planWidth": 4200,
       "planHeight": 3243,
       "planFtPerPx": 0.14643,
       "elevPrefix": 1000,
-      "benchmark": { "name": "Slab F.F.E.", "elev": 1015.50 },
+      "benchmark": {
+        "name": "Slab F.F.E.",
+        "elev": 1015.5
+      },
       "control": [
-        { "id": "c-nw", "name": "Bldg NW corner", "x": 1864, "y": 1685, "lat": null, "lon": null },
-        { "id": "c-ne", "name": "Bldg NE corner", "x": 3374, "y": 1655, "lat": null, "lon": null },
-        { "id": "c-se", "name": "Bldg SE corner", "x": 3384, "y": 2101, "lat": null, "lon": null },
-        { "id": "c-sw", "name": "Bldg SW corner", "x": 1872, "y": 2142, "lat": null, "lon": null }
+        {
+          "id": "c-nw",
+          "name": "Bldg NW corner",
+          "x": 1864,
+          "y": 1685,
+          "lat": null,
+          "lon": null
+        },
+        {
+          "id": "c-ne",
+          "name": "Bldg NE corner",
+          "x": 3374,
+          "y": 1655,
+          "lat": null,
+          "lon": null
+        },
+        {
+          "id": "c-se",
+          "name": "Bldg SE corner",
+          "x": 3384,
+          "y": 2101,
+          "lat": null,
+          "lon": null
+        },
+        {
+          "id": "c-sw",
+          "name": "Bldg SW corner",
+          "x": 1872,
+          "y": 2142,
+          "lat": null,
+          "lon": null
+        }
       ],
       "points": []
+    },
+    {
+      "id": "woodspring-douglasville",
+      "name": "WoodSpring Suites Douglasville",
+      "sheet": "C-2 Grading & Drainage Plan \u2013 Harper Engineering HE-2325 (stamped 3/11/26)",
+      "plan": "plans/woodspring-douglasville-grading.jpg",
+      "planWidth": 4200,
+      "planHeight": 2341,
+      "planFtPerPx": 0.14646,
+      "elevPrefix": 900,
+      "benchmark": {
+        "name": "Slab F.F.E.",
+        "elev": 941.0
+      },
+      "control": [
+        {
+          "id": "c-nw",
+          "name": "Bldg NW corner",
+          "x": 1274,
+          "y": 1148,
+          "lat": null,
+          "lon": null
+        },
+        {
+          "id": "c-ne",
+          "name": "Bldg NE corner",
+          "x": 2852,
+          "y": 1124,
+          "lat": null,
+          "lon": null
+        },
+        {
+          "id": "c-se",
+          "name": "Bldg SE corner",
+          "x": 2852,
+          "y": 1446,
+          "lat": null,
+          "lon": null
+        },
+        {
+          "id": "c-sw",
+          "name": "Bldg SW corner",
+          "x": 1205,
+          "y": 1446,
+          "lat": null,
+          "lon": null
+        }
+      ],
+      "points": [
+        {
+          "id": "s01",
+          "name": "Spot grade",
+          "elev": 940.1,
+          "offset": 0,
+          "x": 964,
+          "y": 640
+        },
+        {
+          "id": "s02",
+          "name": "Spot grade",
+          "elev": 940.4,
+          "offset": 0,
+          "x": 943,
+          "y": 764
+        },
+        {
+          "id": "s03",
+          "name": "Spot grade",
+          "elev": 940.4,
+          "offset": 0,
+          "x": 905,
+          "y": 923
+        },
+        {
+          "id": "s04",
+          "name": "Spot grade",
+          "elev": 940.2,
+          "offset": 0,
+          "x": 985,
+          "y": 1002
+        },
+        {
+          "id": "s05",
+          "name": "Spot grade",
+          "elev": 940.2,
+          "offset": 0,
+          "x": 1112,
+          "y": 988
+        },
+        {
+          "id": "s06",
+          "name": "Spot grade",
+          "elev": 940.1,
+          "offset": 0,
+          "x": 1274,
+          "y": 926
+        },
+        {
+          "id": "s07",
+          "name": "Spot grade",
+          "elev": 940.4,
+          "offset": 0,
+          "x": 1294,
+          "y": 1036
+        },
+        {
+          "id": "s08",
+          "name": "Spot grade",
+          "elev": 939.8,
+          "offset": 0,
+          "x": 868,
+          "y": 1047
+        },
+        {
+          "id": "s09",
+          "name": "Spot grade",
+          "elev": 938.6,
+          "offset": 0,
+          "x": 1508,
+          "y": 709
+        },
+        {
+          "id": "s10",
+          "name": "Spot grade",
+          "elev": 938.9,
+          "offset": 0,
+          "x": 1590,
+          "y": 757
+        },
+        {
+          "id": "s11",
+          "name": "Spot grade",
+          "elev": 939.9,
+          "offset": 0,
+          "x": 2217,
+          "y": 633
+        },
+        {
+          "id": "s12",
+          "name": "Spot grade",
+          "elev": 939.9,
+          "offset": 0,
+          "x": 2313,
+          "y": 630
+        },
+        {
+          "id": "s13",
+          "name": "Spot grade",
+          "elev": 940.1,
+          "offset": 0,
+          "x": 1966,
+          "y": 905
+        },
+        {
+          "id": "s14",
+          "name": "Spot grade",
+          "elev": 940.4,
+          "offset": 0,
+          "x": 1890,
+          "y": 1033
+        },
+        {
+          "id": "s15",
+          "name": "Spot grade",
+          "elev": 940.4,
+          "offset": 0,
+          "x": 2038,
+          "y": 1036
+        },
+        {
+          "id": "s16",
+          "name": "Spot grade",
+          "elev": 940.1,
+          "offset": 0,
+          "x": 2892,
+          "y": 609
+        },
+        {
+          "id": "s17",
+          "name": "Spot grade",
+          "elev": 940.5,
+          "offset": 0,
+          "x": 2985,
+          "y": 609
+        },
+        {
+          "id": "s18",
+          "name": "Spot grade",
+          "elev": 940.3,
+          "offset": 0,
+          "x": 2943,
+          "y": 733
+        },
+        {
+          "id": "s19",
+          "name": "Spot grade",
+          "elev": 940.2,
+          "offset": 0,
+          "x": 2912,
+          "y": 888
+        },
+        {
+          "id": "s20",
+          "name": "Spot grade",
+          "elev": 940.3,
+          "offset": 0,
+          "x": 2820,
+          "y": 957
+        },
+        {
+          "id": "s21",
+          "name": "Spot grade",
+          "elev": 940.3,
+          "offset": 0,
+          "x": 2906,
+          "y": 1050
+        },
+        {
+          "id": "s22",
+          "name": "Spot grade",
+          "elev": 939.9,
+          "offset": 0,
+          "x": 3298,
+          "y": 888
+        },
+        {
+          "id": "s23",
+          "name": "Spot grade",
+          "elev": 939.5,
+          "offset": 0,
+          "x": 3164,
+          "y": 933
+        },
+        {
+          "id": "s24",
+          "name": "Spot grade",
+          "elev": 939.5,
+          "offset": 0,
+          "x": 3432,
+          "y": 926
+        },
+        {
+          "id": "s25",
+          "name": "Spot grade",
+          "elev": 940.2,
+          "offset": 0,
+          "x": 3546,
+          "y": 792
+        },
+        {
+          "id": "s26",
+          "name": "Spot grade",
+          "elev": 940.5,
+          "offset": 0,
+          "x": 3577,
+          "y": 602
+        },
+        {
+          "id": "s27",
+          "name": "Spot grade",
+          "elev": 940.5,
+          "offset": 0,
+          "x": 3697,
+          "y": 720
+        },
+        {
+          "id": "s28",
+          "name": "Spot grade",
+          "elev": 940.5,
+          "offset": 0,
+          "x": 3697,
+          "y": 868
+        },
+        {
+          "id": "s29",
+          "name": "Spot grade",
+          "elev": 940.3,
+          "offset": 0,
+          "x": 3522,
+          "y": 1091
+        },
+        {
+          "id": "s30",
+          "name": "Spot grade",
+          "elev": 940.5,
+          "offset": 0,
+          "x": 3697,
+          "y": 1129
+        },
+        {
+          "id": "s31",
+          "name": "Spot grade",
+          "elev": 940.4,
+          "offset": 0,
+          "x": 1133,
+          "y": 1246
+        },
+        {
+          "id": "s32",
+          "name": "Spot grade",
+          "elev": 939.1,
+          "offset": 0,
+          "x": 874,
+          "y": 1332
+        },
+        {
+          "id": "s33",
+          "name": "Spot grade",
+          "elev": 939.6,
+          "offset": 0,
+          "x": 1005,
+          "y": 1377
+        },
+        {
+          "id": "s34",
+          "name": "Spot grade",
+          "elev": 938.8,
+          "offset": 0,
+          "x": 881,
+          "y": 1425
+        },
+        {
+          "id": "s35",
+          "name": "Spot grade",
+          "elev": 940.2,
+          "offset": 0,
+          "x": 1270,
+          "y": 1525
+        },
+        {
+          "id": "s36",
+          "name": "Spot grade",
+          "elev": 939.8,
+          "offset": 0,
+          "x": 1239,
+          "y": 1639
+        },
+        {
+          "id": "s37",
+          "name": "Spot grade",
+          "elev": 940.4,
+          "offset": 0,
+          "x": 1862,
+          "y": 1518
+        },
+        {
+          "id": "s38",
+          "name": "Spot grade",
+          "elev": 940.2,
+          "offset": 0,
+          "x": 1869,
+          "y": 1628
+        },
+        {
+          "id": "s39",
+          "name": "Spot grade",
+          "elev": 940.4,
+          "offset": 0,
+          "x": 2307,
+          "y": 1508
+        },
+        {
+          "id": "s40",
+          "name": "Spot grade",
+          "elev": 940.2,
+          "offset": 0,
+          "x": 2296,
+          "y": 1618
+        },
+        {
+          "id": "s41",
+          "name": "Spot grade",
+          "elev": 940.8,
+          "offset": 0,
+          "x": 2017,
+          "y": 1639
+        },
+        {
+          "id": "s42",
+          "name": "Spot grade",
+          "elev": 940.5,
+          "offset": 0,
+          "x": 2021,
+          "y": 1776
+        },
+        {
+          "id": "s43",
+          "name": "Spot grade",
+          "elev": 940.4,
+          "offset": 0,
+          "x": 2909,
+          "y": 1298
+        },
+        {
+          "id": "s44",
+          "name": "Spot grade",
+          "elev": 940.5,
+          "offset": 0,
+          "x": 3580,
+          "y": 1239
+        },
+        {
+          "id": "s45",
+          "name": "Spot grade",
+          "elev": 940.3,
+          "offset": 0,
+          "x": 3594,
+          "y": 1329
+        },
+        {
+          "id": "s46",
+          "name": "Spot grade",
+          "elev": 940.5,
+          "offset": 0,
+          "x": 3704,
+          "y": 1336
+        },
+        {
+          "id": "s47",
+          "name": "Spot grade",
+          "elev": 940.2,
+          "offset": 0,
+          "x": 2909,
+          "y": 1449
+        },
+        {
+          "id": "s48",
+          "name": "Spot grade",
+          "elev": 939.9,
+          "offset": 0,
+          "x": 3026,
+          "y": 1467
+        },
+        {
+          "id": "s49",
+          "name": "Spot grade",
+          "elev": 940.2,
+          "offset": 0,
+          "x": 2906,
+          "y": 1501
+        },
+        {
+          "id": "s50",
+          "name": "Spot grade",
+          "elev": 939.6,
+          "offset": 0,
+          "x": 3312,
+          "y": 1518
+        },
+        {
+          "id": "s51",
+          "name": "Spot grade",
+          "elev": 939.4,
+          "offset": 0,
+          "x": 3178,
+          "y": 1570
+        },
+        {
+          "id": "s52",
+          "name": "Spot grade",
+          "elev": 939.4,
+          "offset": 0,
+          "x": 3443,
+          "y": 1562
+        },
+        {
+          "id": "s53",
+          "name": "Spot grade",
+          "elev": 940.2,
+          "offset": 0,
+          "x": 2930,
+          "y": 1618
+        },
+        {
+          "id": "s54",
+          "name": "Spot grade",
+          "elev": 940.2,
+          "offset": 0,
+          "x": 2864,
+          "y": 1714
+        },
+        {
+          "id": "s55",
+          "name": "Spot grade",
+          "elev": 940.1,
+          "offset": 0,
+          "x": 3701,
+          "y": 1742
+        },
+        {
+          "id": "st1",
+          "name": "Inlet A6 grate",
+          "elev": 938.6,
+          "offset": 0,
+          "x": 1639,
+          "y": 630
+        },
+        {
+          "id": "st2",
+          "name": "Inlet A5 grate",
+          "elev": 938.8,
+          "offset": 0,
+          "x": 2637,
+          "y": 613
+        },
+        {
+          "id": "st3",
+          "name": "Inlet A4",
+          "elev": 939.1,
+          "offset": 0,
+          "x": 3295,
+          "y": 974
+        },
+        {
+          "id": "st4",
+          "name": "Inlet A3",
+          "elev": 938.9,
+          "offset": 0,
+          "x": 3315,
+          "y": 1694
+        },
+        {
+          "id": "st5",
+          "name": "Inlet A2",
+          "elev": 938.9,
+          "offset": 0,
+          "x": 2527,
+          "y": 1697
+        },
+        {
+          "id": "st6",
+          "name": "Inlet B1 grate",
+          "elev": 937.9,
+          "offset": 0,
+          "x": 874,
+          "y": 1673
+        },
+        {
+          "id": "st7",
+          "name": "SWCB C2 lid",
+          "elev": 941.8,
+          "offset": 0,
+          "x": 613,
+          "y": 658
+        },
+        {
+          "id": "w1",
+          "name": "Wall bottom (top 940.5)",
+          "elev": 938.5,
+          "offset": 0,
+          "x": 3722,
+          "y": 698
+        },
+        {
+          "id": "w2",
+          "name": "Wall bottom (top 940.5)",
+          "elev": 939.5,
+          "offset": 0,
+          "x": 3725,
+          "y": 855
+        },
+        {
+          "id": "w3",
+          "name": "Wall bottom (top 940.0)",
+          "elev": 939.0,
+          "offset": 0,
+          "x": 3740,
+          "y": 1618
+        }
+      ]
     }
   ]
 }
