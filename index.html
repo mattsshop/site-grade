@@ -163,7 +163,7 @@
       </div>
     </div>
     <div class="warn-banner" id="noHiBanner" style="display:none">
-      Set up the laser first: go to <b>Setup</b> and shoot the benchmark.
+      <b>Laser:</b> go to <b>Setup</b> and shoot the benchmark.<br><b>GPS rover:</b> tap <b>📍</b> (right side) to use GPS elevation instead.
     </div>
     <div id="gradePanel"></div>
     <div class="hint" id="hint">Tap where you're standing to take a shot</div>
@@ -347,7 +347,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = '1.3.0';
+const VERSION = '1.3.1';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
@@ -462,7 +462,7 @@ planView.addEventListener('wheel', e => {
 
 const ptrs = new Map(); let gesture = null;
 planView.addEventListener('pointerdown', e => {
-  if (e.target.closest('.plan-tools, .warn-banner')) return;
+  if (e.target.closest('.plan-tools, .warn-banner, #gradePanel')) return;
   planView.setPointerCapture(e.pointerId);
   ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (ptrs.size === 1) gesture = { tap: true, t: Date.now(), sx: e.clientX, sy: e.clientY, lx: e.clientX, ly: e.clientY };
@@ -514,7 +514,7 @@ function updateHint(){
     : mode === 'point' ? 'Tap the plan to add a target point'
     : near ? `Nearest: ${near.p.name || 'point'} · ${Math.round(near.ft)} ft`
     : (S.points.length ? 'Tap an orange point, or tap where you are standing' : 'Tap where you are standing to take a shot'));
-  $('#noHiBanner').style.display = (mode === 'shoot' && !isFinite(HI())) ? 'block' : 'none';
+  $('#noHiBanner').style.display = (mode === 'shoot' && !isFinite(HI()) && !gps.on && !S.gElev) ? 'block' : 'none';
 }
 
 /* ---------- tap handling ---------- */
@@ -863,7 +863,7 @@ function geoFit(){
 const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
 // v1.2.2: once the plan is calibrated, show the dot automatically (no need to find the 📍 button)
 function autoGps(){
-  if (gps.on || gps.userOff || !gps.fit) return;
+  if (gps.on || gps.userOff || (!gps.fit && !S.gElev)) return;
   if (!startGps()) return;
   gps.on = true; gps.follow = false; gps.centeredOnce = false;
   updateGpsBtn();
@@ -950,9 +950,9 @@ function updateGpsBtn(){
 $('#gpsBtn').onclick = () => {
   if (!gps.on) {
     gps.userOff = false;
-    if (!gps.fit) { toast('Capture GPS on at least 2 control points first (📍 Cal)'); mode = 'cal'; $$('#modeSeg button').forEach(x => x.classList.toggle('on', x.dataset.mode === 'cal')); renderPins(); updateHint(); return; }
     if (!startGps()) return;
-    gps.on = true; gps.follow = true;
+    gps.on = true; gps.follow = !!gps.fit;
+    if (!gps.fit) toast('GPS on – elevation works now. For the dot on the plan, capture 2+ corners in 📍 Cal');
     if (view.s < 0.35) { const cx = planView.clientWidth / 2, cy = planView.clientHeight / 2; zoomAt(cx, cy, 0.5 / view.s); }
     toast('GPS on – following you');
   } else if (!gps.follow) { gps.follow = true; if (gps.plan) centerOn(gps.plan.x, gps.plan.y); }
@@ -1084,42 +1084,56 @@ function quality(){
   if (f.acc <= 0.6) return { lvl: 'float', txt: `GPS ±${(f.acc * FT * 12).toFixed(0)}" – not RTK Fixed, elevations may be off` };
   return { lvl: 'gps', txt: `GPS ±${(f.acc * FT).toFixed(0)} ft – no RTK fix, don't trust elevations` };
 }
-let lastGradeDraw = 0;
+let lastGradeDraw = 0, gradeBuilt = false;
+// panel structure is built once; updates only change text so taps on its buttons are never lost
+function buildGrade(){
+  const el = $('#gradePanel');
+  el.innerHTML = `
+    <div id="gpMsg" class="gp-sub" style="display:none"></div>
+    <div id="gpLive">
+      <div class="gp-row"><span>Ground</span><b id="gpGround">—</b><span>Target</span><b id="gpTgt">—</b></div>
+      <div class="gp-big" id="gpBig">—</div>
+      <div class="gp-sub" id="gpSub"></div>
+    </div>
+    <div class="gp-warn" id="gpWarn" style="display:none"></div>
+    <div class="gp-btns">
+      <button class="pri" id="gpCal" style="display:none">Calibrate on slab</button>
+      <button id="gpTarget">Set target</button>
+      <button class="pri" id="gpRec">Record shot</button>
+    </div>`;
+  $('#gpCal').onclick = openCal;
+  $('#gpTarget').onclick = () => openSheet({ kind: 'gtarget' });
+  $('#gpRec').onclick = recordGpsShot;
+  gradeBuilt = true;
+}
 function renderGrade(force){
   const el = $('#gradePanel');
   const show = gps.on && mode === 'shoot' && $('#planView').classList.contains('active');
   if (!show) { el.style.display = 'none'; return; }
   if (!force && Date.now() - lastGradeDraw < 250) return; lastGradeDraw = Date.now();
   updateHeader();
+  if (!gradeBuilt) buildGrade();
   el.style.display = 'block';
-  const q = quality();
-  if (gps.fix && !isNum(gps.fix.alt)) {
-    el.innerHTML = `<div class="gp-sub">GPS has no elevation. With an RTK rover, make sure GNSS Master's Mock Location is on.</div>`;
-    return;
-  }
-  if (!S.gElev) {
-    el.innerHTML = `<div class="gp-sub">Elevation not calibrated yet</div>
-      <div class="gp-btns"><button class="pri" id="gpCal">Calibrate on slab</button></div>
-      ${q.txt ? `<div class="gp-warn">${q.txt}</div>` : ''}`;
-    $('#gpCal').onclick = openCal; return;
-  }
+  const q = quality(), noAlt = gps.fix && !isNum(gps.fix.alt), cal = !!S.gElev;
+  const vis = (id, on) => { $(id).style.display = on ? '' : 'none'; };
+  vis('#gpMsg', noAlt || !cal); vis('#gpLive', !noAlt && cal);
+  vis('#gpCal', !noAlt && !cal); vis('#gpTarget', !noAlt && cal); vis('#gpRec', !noAlt && cal);
+  $('#gpMsg').textContent = noAlt ? "GPS has no elevation. With an RTK rover, make sure GNSS Master's Mock Location is on." : 'Elevation not calibrated yet';
+  $('#gpWarn').textContent = q.txt ? '⚠ ' + q.txt : ''; vis('#gpWarn', !!q.txt && !noAlt);
+  if (noAlt || !cal) return;
   const g = groundFt(), t = activeTarget();
   let big = '—', cls = '', sub = 'Set a target grade to see CUT/FILL';
   if (t && isNum(g)) {
     const tgt = t.elev - (t.offset || 0) / 12, d = g - tgt;
     cls = d > S.tol + 1e-9 ? 'cut' : d < -S.tol - 1e-9 ? 'fill' : 'ok';
     big = cls === 'ok' ? 'ON GRADE' : (cls === 'cut' ? 'CUT ' : 'FILL ') + Math.abs(d).toFixed(2) + "'";
-    sub = `${cls === 'ok' ? '' : toInches(d) + ' · '}target dirt ${f2(tgt)}${t.auto ? ` · ${esc(t.name)} (${Math.round(t.ft)} ft away)` : ''}`;
+    sub = `${cls === 'ok' ? '' : toInches(d) + ' · '}target dirt ${f2(tgt)}${t.auto ? ` · ${t.name} (${Math.round(t.ft)} ft away)` : ''}`;
   }
-  el.innerHTML = `
-    <div class="gp-row"><span>Ground</span><b>${isNum(g) ? f2(g) : '—'}</b>
-      <span>Target</span><b>${t ? f2(t.elev) + (t.offset ? ` −${t.offset}"` : '') : '—'}</b></div>
-    <div class="gp-big ${cls}">${big}</div>
-    <div class="gp-sub">${sub}</div>
-    ${q.txt ? `<div class="gp-warn">⚠ ${q.txt}</div>` : ''}
-    <div class="gp-btns"><button id="gpTarget">${t ? 'Change target' : 'Set target'}</button><button class="pri" id="gpRec">Record shot</button></div>`;
-  $('#gpTarget').onclick = () => openSheet({ kind: 'gtarget' });
-  $('#gpRec').onclick = recordGpsShot;
+  $('#gpGround').textContent = isNum(g) ? f2(g) : '—';
+  $('#gpTgt').textContent = t ? f2(t.elev) + (t.offset ? ` −${t.offset}"` : '') : '—';
+  $('#gpBig').textContent = big; $('#gpBig').className = 'gp-big ' + cls;
+  $('#gpSub').textContent = sub;
+  $('#gpTarget').textContent = t ? 'Change target' : 'Set target';
 }
 function recordGpsShot(){
   const g = groundFt(), t = activeTarget();
@@ -1214,7 +1228,7 @@ function loadProject(id){
   view.fitted = false;
   img.onload = () => { fit(); renderPins(); };
   img.src = proj.plan;
-  geoFit(); updateHeader(); updateHint(); renderPins();
+  geoFit(); autoGps(); updateHeader(); updateHint(); renderPins();
   if ($('#setupView').classList.contains('active')) renderSetup();
 }
 
