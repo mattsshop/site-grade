@@ -638,6 +638,47 @@
         "rot": -60.097
       },
       "surface": "surfaces/woodspring-fg.json"
+    },
+    {
+      "id": "home-test",
+      "name": "Home test (yard)",
+      "sheet": "Google Earth satellite \u2013 test site for the RTK rover",
+      "plan": "plans/home-test.jpg",
+      "planWidth": 1300,
+      "planHeight": 1161,
+      "planFtPerPx": 0.14149,
+      "elevPrefix": 0,
+      "benchmark": {
+        "name": "Driveway (test)",
+        "elev": 100.0
+      },
+      "control": [
+        {
+          "id": "c1",
+          "name": "corner 1",
+          "x": 323,
+          "y": 676,
+          "lat": 33.91130103277381,
+          "lon": -84.68366509783593
+        },
+        {
+          "id": "c2",
+          "name": "corner 2",
+          "x": 752,
+          "y": 541,
+          "lat": 33.91135362261348,
+          "lon": -84.68346462101502
+        },
+        {
+          "id": "c3",
+          "name": "corner 3",
+          "x": 476,
+          "y": 498,
+          "lat": 33.91136987398809,
+          "lon": -84.6835937104128
+        }
+      ],
+      "points": []
     }
   ]
 }
