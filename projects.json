@@ -627,7 +627,17 @@
           "x": 3740,
           "y": 1618
         }
-      ]
+      ],
+      "georef": {
+        "crs": "EPSG:2240",
+        "note": "NAD83 Georgia West US ft; fit to Harper PROPOSED surface using 62 plan spot grades (median 0.05 ft)",
+        "E": 2159628.28,
+        "N": 1378567.26,
+        "px": 2032.1,
+        "py": 1304.7,
+        "rot": -60.097
+      },
+      "surface": "surfaces/woodspring-fg.json"
     }
   ]
 }

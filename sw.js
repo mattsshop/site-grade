@@ -1,6 +1,6 @@
 // Site Grade service worker – lets the app open with no cell signal.
 // Bump CACHE when releasing a new version so phones pick up the update.
-const CACHE = 'site-grade-v1.5.0';
+const CACHE = 'site-grade-v1.5.1';
 const SHELL = [
   './',
   './index.html',
@@ -10,7 +10,8 @@ const SHELL = [
   './icon-512.png',
   './plans/home2-douglasville-grading.jpg',
   './plans/woodspring-douglasville-grading.jpg',
-  './surfaces/home2-fg.json'
+  './surfaces/home2-fg.json',
+  './surfaces/woodspring-fg.json'
 ];
 
 self.addEventListener('install', e => {

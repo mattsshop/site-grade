@@ -3,7 +3,7 @@
 Mobile web app for checking dirt grades with a rotating laser and a grade rod.
 Hosted on GitHub Pages; works offline after the first load.
 
-**Current version: v1.5.0**
+**Current version: v1.5.1**
 
 ## How it works
 1. **Setup** – shoot the benchmark (e.g. slab F.F.E.). App computes laser HI = BM elevation + rod reading.
@@ -16,6 +16,8 @@ Math: target dirt = plan elev − offset; actual dirt = HI − rod; cut(+)/fill(
 Spot elevations can be typed short (`14.33` → `1014.33`) using the project's elevation prefix.
 
 ## Design surface + state plane (v1.5)
+- **v1.5.1:** WoodSpring Douglasville has Harper's PROPOSED surface (`surfaces/woodspring-fg.json`), tied to state plane
+  using the plan's spot grades (median difference 0.05 ft).
 - Home 2 Douglasville has HRC's Civil 3D **FG (finished grade) surface** (`surfaces/home2-fg.json`, from the LandXML)
   and the plan is tied to **NAD83 Georgia West state plane** (`georef` in projects.json).
 - **GPS dot works with no control points.** GPS lat/long → state plane → plan. Capturing 1+ control point only removes
