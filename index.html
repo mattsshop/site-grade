@@ -62,6 +62,9 @@
     transform:translate(-50%,-50%) scale(var(--inv,1));pointer-events:none;display:none}
   .fab.gps-on{background:#2563eb}
   .fab.gps-follow{background:#2563eb;box-shadow:0 0 0 3px #93c5fd}
+  .fab.spots-btn{font-size:20px;color:#f59e0b}
+  .fab.spots-btn.off{color:#64748b;text-decoration:line-through}
+  .hide-spots .pin.target{display:none}
   .fab.wide{width:auto;padding:0 12px;font-size:14px;font-weight:700}
   #gradePanel{position:absolute;left:10px;right:10px;bottom:50px;background:rgba(17,24,31,.94);border:1px solid var(--line);border-radius:14px;
     padding:10px 12px;color:#fff;display:none;box-shadow:0 4px 14px rgba(0,0,0,.35);max-width:520px;margin:0 auto}
@@ -160,6 +163,7 @@
         <button class="fab" id="zoomOut" aria-label="Zoom out">−</button>
         <button class="fab" id="zoomFit" aria-label="Fit plan">⤢</button>
         <button class="fab" id="gpsBtn" aria-label="GPS location">📍</button>
+        <button class="fab spots-btn" id="spotsBtn" aria-label="Show or hide spot points">◉</button>
         <button class="fab wide" id="shotHere" style="display:none">Shot here</button>
       </div>
     </div>
@@ -356,7 +360,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = '1.5.1';
+const VERSION = '1.5.2';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
@@ -560,6 +564,7 @@ function onTap(cx, cy){
 
 /* ---------- pins ---------- */
 function renderPins(){
+  if (typeof applySpots === 'function') applySpots();
   const html = [];
   if (mode === 'cal' || pendingMove) for (const c of S.geo) {
     const ok = isNum(c.lat) && isNum(c.lon);
@@ -674,6 +679,7 @@ $('#shSave').onclick = () => {
   if (ctx.kind === 'point') {
     if (ctx.point) Object.assign(ctx.point, { name, elev: e, offset: curOffset });
     else S.points.push({ id: 'p' + Date.now(), name, elev: e, offset: curOffset, x: Math.round(ctx.x), y: Math.round(ctx.y) });
+    S.showSpots = true;
     save(); renderPins(); closeSheet(); updateHint(); toast('Point saved'); return;
   }
   if (ctx.kind === 'gtarget') {
@@ -908,6 +914,16 @@ function surfAtPlan(x, y){
   if (!surf.d || !proj.georef || !isNum(x) || !isNum(y)) return NaN;
   const p = planToSP(x, y); return surfZ(p.E, p.N);
 }
+// v1.5.2: show/hide the orange spot / target points (view only – GPS still uses them for targets)
+function applySpots(){
+  const off = S.showSpots === false;
+  stage.classList.toggle('hide-spots', off);
+  const b = $('#spotsBtn'); if (b) { b.classList.toggle('off', off); b.style.display = S.points.length ? '' : 'none'; }
+}
+$('#spotsBtn').onclick = () => {
+  S.showSpots = S.showSpots === false; save(); applySpots();
+  toast(S.showSpots === false ? 'Spot points hidden – tap ◉ to show' : 'Spot points shown');
+};
 function renderSurfStatus(){
   const el = $('#surfStatus'); if (!el) return;
   const card = $('#surfCard'); if (card) card.style.display = proj.surface ? '' : 'none';
@@ -1344,7 +1360,7 @@ function loadProject(id){
   view.fitted = false;
   img.onload = () => { fit(); renderPins(); };
   img.src = proj.plan;
-  loadSurface();
+  loadSurface(); applySpots();
   geoFit(); autoGps(); updateHeader(); updateHint(); renderPins();
   if ($('#setupView').classList.contains('active')) renderSetup();
 }
