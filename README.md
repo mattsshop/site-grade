@@ -3,7 +3,7 @@
 Mobile web app for checking dirt grades with a rotating laser and a grade rod.
 Hosted on GitHub Pages; works offline after the first load.
 
-**Current version: v1.4.0**
+**Current version: v1.5.0**
 
 ## How it works
 1. **Setup** – shoot the benchmark (e.g. slab F.F.E.). App computes laser HI = BM elevation + rod reading.
@@ -14,6 +14,15 @@ Hosted on GitHub Pages; works offline after the first load.
 Math: target dirt = plan elev − offset; actual dirt = HI − rod; cut(+)/fill(−) = actual − target.
 
 Spot elevations can be typed short (`14.33` → `1014.33`) using the project's elevation prefix.
+
+## Design surface + state plane (v1.5)
+- Home 2 Douglasville has HRC's Civil 3D **FG (finished grade) surface** (`surfaces/home2-fg.json`, from the LandXML)
+  and the plan is tied to **NAD83 Georgia West state plane** (`georef` in projects.json).
+- **GPS dot works with no control points.** GPS lat/long → state plane → plan. Capturing 1+ control point only removes
+  the GPS datum shift (often 2–4 ft); capture one building corner for best results.
+- **GPS target = design surface** at the spot you're standing (finished grade). Set a depth for dirt with
+  Set target → offset chip → *Use design surface instead*. A typed target overrides it until you switch back.
+- **Laser shots:** tapping the plan fills in the finished grade from the surface automatically.
 
 ## Projects (v1.4)
 - **Home 2 Suites Douglasville** – GP1 grading plan, slab F.F.E. 1015.50.

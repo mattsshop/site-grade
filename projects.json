@@ -47,7 +47,17 @@
           "lon": null
         }
       ],
-      "points": []
+      "points": [],
+      "georef": {
+        "crs": "EPSG:2240",
+        "note": "NAD83 Georgia West US ft; plan px = rotate/scale of state plane (fit to HRC FG surface)",
+        "E": 2142665.96,
+        "N": 1359200.64,
+        "px": 2611,
+        "py": 1566.5,
+        "rot": -38.05
+      },
+      "surface": "surfaces/home2-fg.json"
     },
     {
       "id": "woodspring-douglasville",

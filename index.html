@@ -204,6 +204,13 @@
         <button class="btn ghost" id="chkBtn">Check</button>
       </div>
 
+      <div class="card" id="surfCard" style="display:none">
+        <h2>Design surface (finished grade)</h2>
+        <div class="muted">The engineer's finished-grade surface is loaded. With the GPS rover, the target grade is taken from the surface right where you stand – no target points needed. Tapping the plan for a laser shot fills in the finished grade too.</div>
+        <div id="surfStatus" class="resid"></div>
+        <div class="note">Target is finished grade (top of pavement, curb, slab). For dirt, set a depth with <b>Set target → offset chips → Use design surface</b> (e.g. −8" for the pavement section).</div>
+      </div>
+
       <div class="card">
         <h2>GPS elevation (RTK rover)</h2>
         <div class="muted">With an RTK rover feeding the tablet, Site Grade reads elevation as you walk – no laser or rod reading. Calibrate once on a known elevation (the slab), then the Plan tab shows live CUT/FILL.</div>
@@ -306,6 +313,7 @@
     <button class="btn ghost" id="shCancel">Cancel</button>
     <button class="btn" id="shSave">Save shot</button>
   </div>
+  <button class="btn ghost" id="shSurf" style="display:none">Use design surface instead (auto)</button>
   <button class="btn danger sm" id="shDelete" style="display:none">Delete</button>
 </div>
 
@@ -348,7 +356,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = '1.4.0';
+const VERSION = '1.5.0';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
@@ -602,12 +610,19 @@ function openSheet(c){
   $('#shRodWrap').style.display = (isPoint || isGTarget || gpsShot) ? 'none' : 'block';
   $('#shSave').textContent = isGTarget ? 'Use this target' : isPoint ? 'Save point' : existingShot ? 'Update shot' : 'Save shot';
   $('#shDelete').style.display = (existingShot || existingPt) ? 'block' : 'none';
+  $('#shSurf').style.display = isGTarget && surf.d ? 'block' : 'none';
 
   const src = isGTarget ? (S.gTarget || null) : existingShot ? c.shot : existingPt ? c.point : c.from || null;
   $('#shName').value = src?.name || '';
   $('#shName').placeholder = isPoint ? 'e.g. Curb NE corner' : 'Optional – e.g. pad SW';
   $('#shElev').value = src && isFinite(src.elev) ? src.elev.toFixed(2) : '';
   setOffset(src?.offset ?? 0);
+  // v1.5: new shot / point on a project with a design surface – fill in the finished grade where you tapped
+  if (!src && !existingShot && (c.kind === 'shot' || isPoint) && isNum(c.x)) {
+    const z = surfAtPlan(c.x, c.y);
+    if (isNum(z)) { $('#shElev').value = z.toFixed(2); $('#shSub').textContent += ' · finished grade filled from design surface'; }
+  }
+  if (isGTarget && S.gSurf !== false && surf.d) setOffset(S.gSurfOff || 0);
   $('#shRod').value = existingShot && isNum(c.shot.rod) ? c.shot.rod.toFixed(2) : '';
   liveCalc();
   sheetOpenedAt = Date.now();
@@ -662,7 +677,7 @@ $('#shSave').onclick = () => {
     save(); renderPins(); closeSheet(); updateHint(); toast('Point saved'); return;
   }
   if (ctx.kind === 'gtarget') {
-    S.gTarget = { name, elev: e, offset: curOffset }; S.gAuto = false;
+    S.gTarget = { name, elev: e, offset: curOffset }; S.gAuto = false; S.gSurf = false;
     save(); closeSheet(); renderGrade(true); toast('Target set – ' + f2(e - curOffset / 12) + ' dirt'); return;
   }
   if (ctx.shot && ctx.shot.src === 'gps') {
@@ -677,6 +692,11 @@ $('#shSave').onclick = () => {
                       x: Math.round(ctx.x), y: Math.round(ctx.y), pointId: ctx.from?.id || null });
   const r = compute(e, curOffset, rod);
   save(); renderPins(); closeSheet(); toast(`Saved – ${resultText(r)}`);
+};
+$('#shSurf').onclick = () => {
+  S.gSurf = true; S.gAuto = true; S.gSurfOff = curOffset;
+  save(); closeSheet(); renderGrade(true); renderSurfStatus();
+  toast('Target = design surface' + (curOffset ? ` −${curOffset}"` : ''));
 };
 $('#shDelete').onclick = () => {
   if (!confirmLite()) return;
@@ -695,6 +715,7 @@ function confirmLite(){
 
 /* ---------- setup ---------- */
 function renderSetup(){
+  renderSurfStatus();
   $('#projSelect').innerHTML = projects.map(p => `<option value="${p.id}" ${p.id === proj.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
   $('#bmName').value = S.bm.name || '';
   $('#bmElev').value = isFinite(S.bm.elev) && S.bm.elev != null ? S.bm.elev.toFixed(2) : '';
@@ -828,6 +849,74 @@ $('#clearLog').onclick = function(){
 };
 
 
+/* ---------- v1.5: state plane + design surface ---------- */
+// NAD83 Georgia West (EPSG 2240), Transverse Mercator, GRS80 – returns US survey feet
+function tmGAW(lat, lon){
+  const a = 6378137, f = 1 / 298.257222101, e2 = f * (2 - f), ep2 = e2 / (1 - e2), k0 = 0.9999;
+  const d = Math.PI / 180, phi = lat * d, lam = lon * d, phi0 = 30 * d, lam0 = -84.16666666666667 * d;
+  const M = p => a * ((1 - e2 / 4 - 3 * e2 * e2 / 64 - 5 * e2 ** 3 / 256) * p - (3 * e2 / 8 + 3 * e2 * e2 / 32 + 45 * e2 ** 3 / 1024) * Math.sin(2 * p)
+            + (15 * e2 * e2 / 256 + 45 * e2 ** 3 / 1024) * Math.sin(4 * p) - (35 * e2 ** 3 / 3072) * Math.sin(6 * p));
+  const sn = Math.sin(phi), cs = Math.cos(phi), N = a / Math.sqrt(1 - e2 * sn * sn), T = Math.tan(phi) ** 2, C = ep2 * cs * cs, A = (lam - lam0) * cs;
+  const x = k0 * N * (A + (1 - T + C) * A ** 3 / 6 + (5 - 18 * T + T * T + 72 * C - 58 * ep2) * A ** 5 / 120);
+  const y = k0 * (M(phi) - M(phi0) + N * Math.tan(phi) * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * A ** 4 / 24 + (61 - 58 * T + T * T + 600 * C - 330 * ep2) * A ** 6 / 720));
+  const USFT = 1200 / 3937;
+  return { E: (700000 + x) / USFT, N: y / USFT };
+}
+function spToPlan(E, N){
+  const g = proj.georef, f = proj.planFtPerPx, t = g.rot * Math.PI / 180, dx = (E - g.E) / f, dy = (N - g.N) / f;
+  return { x: g.px + dx * Math.cos(t) - dy * Math.sin(t), y: g.py - (dx * Math.sin(t) + dy * Math.cos(t)) };
+}
+function planToSP(x, y){
+  const g = proj.georef, f = proj.planFtPerPx, t = g.rot * Math.PI / 180, u = x - g.px, v = -(y - g.py);
+  return { E: g.E + (u * Math.cos(t) + v * Math.sin(t)) * f, N: g.N + (-u * Math.sin(t) + v * Math.cos(t)) * f };
+}
+const surf = { id: null, d: null, grid: null, cell: 25 };
+function loadSurface(){
+  surf.d = surf.grid = null; surf.id = proj.id;
+  if (!proj.surface || !proj.georef) return;
+  const id = proj.id;
+  fetch(proj.surface).then(r => r.json()).then(d => {
+    if (proj.id !== id) return;
+    const n = d.p.length / 3, xs = new Float64Array(n), ys = new Float64Array(n), zs = new Float64Array(n);
+    for (let i = 0; i < n; i++) { xs[i] = d.p[3 * i]; ys[i] = d.p[3 * i + 1]; zs[i] = d.p[3 * i + 2]; }
+    const grid = new Map(), c = surf.cell;
+    for (let t = 0; t < d.f.length; t += 3) {
+      const a = d.f[t], b = d.f[t + 1], k = d.f[t + 2];
+      const x0 = Math.floor(Math.min(xs[a], xs[b], xs[k]) / c), x1 = Math.floor(Math.max(xs[a], xs[b], xs[k]) / c);
+      const y0 = Math.floor(Math.min(ys[a], ys[b], ys[k]) / c), y1 = Math.floor(Math.max(ys[a], ys[b], ys[k]) / c);
+      for (let i = x0; i <= x1; i++) for (let j = y0; j <= y1; j++) { const key = i + ',' + j; (grid.get(key) || grid.set(key, []).get(key)).push(t); }
+    }
+    surf.d = { E0: d.E0, N0: d.N0, xs, ys, zs, f: d.f, name: d.name }; surf.grid = grid;
+    renderGrade(true); renderSurfStatus();
+  }).catch(() => { toast('Could not load the design surface'); });
+}
+// finished-grade elevation at a state plane point (NaN outside the surface)
+function surfZ(E, N){
+  const s = surf.d; if (!s) return NaN;
+  const x = E - s.E0, y = N - s.N0, list = surf.grid.get(Math.floor(x / surf.cell) + ',' + Math.floor(y / surf.cell));
+  if (!list) return NaN;
+  for (const t of list) {
+    const a = s.f[t], b = s.f[t + 1], c = s.f[t + 2];
+    const x1 = s.xs[a], y1 = s.ys[a], x2 = s.xs[b], y2 = s.ys[b], x3 = s.xs[c], y3 = s.ys[c];
+    const den = (y2 - y3) * (x1 - x3) + (x3 - x2) * (y1 - y3); if (!den) continue;
+    const l1 = ((y2 - y3) * (x - x3) + (x3 - x2) * (y - y3)) / den, l2 = ((y3 - y1) * (x - x3) + (x1 - x3) * (y - y3)) / den, l3 = 1 - l1 - l2;
+    if (l1 >= -1e-9 && l2 >= -1e-9 && l3 >= -1e-9) return l1 * s.zs[a] + l2 * s.zs[b] + l3 * s.zs[c];
+  }
+  return NaN;
+}
+function surfAtPlan(x, y){
+  if (!surf.d || !proj.georef || !isNum(x) || !isNum(y)) return NaN;
+  const p = planToSP(x, y); return surfZ(p.E, p.N);
+}
+function renderSurfStatus(){
+  const el = $('#surfStatus'); if (!el) return;
+  const card = $('#surfCard'); if (card) card.style.display = proj.surface ? '' : 'none';
+  if (!proj.surface) return;
+  el.innerHTML = surf.d ? `<span>Surface</span><b>${esc(surf.d.name.split(' (')[0])}</b><span>Triangles</span><b>${(surf.d.f.length / 3).toLocaleString()}</b>
+    <span>Use for GPS target</span><b>${S.gSurf !== false ? 'Yes' + (S.gSurfOff ? ` (−${S.gSurfOff}")` : '') : 'No – manual target'}</b>`
+    : '<span style="grid-column:1/3">Loading surface…</span>';
+}
+
 /* ---------- GPS on the plan (v1.2) ---------- */
 let pendingMove = null;
 const gps = { on: false, follow: false, watch: null, fix: null, plan: null, fit: null, altBuf: [] };
@@ -842,6 +931,17 @@ function toLocal(lat, lon, ref){
 function geoFit(){
   gps.fit = null;
   const pts = S.geo.filter(c => isNum(c.lat) && isNum(c.lon));
+  if (proj.georef) {
+    // v1.5: plan is tied to state plane. Captured control points only remove the datum shift (translation).
+    let dx = 0, dy = 0;
+    if (pts.length) {
+      const raw = pts.map(c => { const s = tmGAW(c.lat, c.lon); return spToPlan(s.E, s.N); });
+      dx = avg(pts.map((c, i) => c.x - raw[i].x)); dy = avg(pts.map((c, i) => c.y - raw[i].y));
+    }
+    const k = 1 / (proj.planFtPerPx * M_PER_FT);
+    gps.fit = { geo: true, dx, dy, n: pts.length, fitScale: k };
+    autoGps(); updateGpsDot(); return gps.fit;
+  }
   if (pts.length < 2) { updateGpsDot(); return null; }
   const ref = { lat: pts.reduce((a, c) => a + c.lat, 0) / pts.length, lon: pts.reduce((a, c) => a + c.lon, 0) / pts.length };
   const G = pts.map(c => toLocal(c.lat, c.lon, ref)), P = pts.map(c => ({ x: c.x, y: -c.y }));
@@ -867,17 +967,18 @@ function geoFit(){
 const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
 // v1.2.2: once the plan is calibrated, show the dot automatically (no need to find the 📍 button)
 function autoGps(){
-  if (gps.on || gps.userOff || (!gps.fit && !S.gElev)) return;
+  if (gps.on || gps.userOff || ((!gps.fit || !gps.fit.n) && !S.gElev)) return;
   if (!startGps()) return;
   gps.on = true; gps.follow = false; gps.centeredOnce = false;
   updateGpsBtn();
 }
 function geoToPlan(lat, lon){
   const f = gps.fit; if (!f) return null;
+  if (f.geo) { const s = tmGAW(lat, lon), q = spToPlan(s.E, s.N); return { x: q.x + f.dx, y: q.y + f.dy }; }
   const g = toLocal(lat, lon, f.ref);
   return { x: f.sr * g.e - f.si * g.n + f.tx, y: -(f.sr * g.n + f.si * g.e + f.ty) };
 }
-const pxPerM = () => gps.fit ? Math.hypot(gps.fit.sr, gps.fit.si) : NaN;
+const pxPerM = () => !gps.fit ? NaN : gps.fit.geo ? gps.fit.fitScale : Math.hypot(gps.fit.sr, gps.fit.si);
 const ftPerPx = () => proj.planFtPerPx || (1 / pxPerM()) / M_PER_FT;
 function geoResid(c){
   if (!gps.fit || !isNum(c.lat) || !isNum(c.lon) || gps.fit.n < 3 && !S.useScale) return NaN;
@@ -888,6 +989,13 @@ function renderGeoStatus(){
   const el = $('#geoStatus'); if (!el) return;
   const set = S.geo.filter(c => isNum(c.lat) && isNum(c.lon));
   let h = `<span>Control points</span><b>${S.geo.length}</b><span>Captured with GPS</span><b>${set.length}</b>`;
+  if (gps.fit?.geo) {
+    h += `<span style="grid-column:1/3;color:var(--ok)">This plan is tied to state plane coordinates – the GPS dot works without control points.</span>`;
+    h += set.length ? `<span>Datum shift removed</span><b>${(Math.hypot(gps.fit.dx, gps.fit.dy) * proj.planFtPerPx).toFixed(1)} ft</b>`
+      : `<span style="grid-column:1/3;color:var(--target)">Optional: capture 1 corner to remove the GPS datum shift (often 2–4 ft).</span>`;
+    if (set.length > 1) for (const c of set) { const r = geoResid(c); if (isFinite(r)) h += `<span>${esc(c.name)}</span><b style="color:${r > 3 ? 'var(--cut)' : 'var(--text)'}">±${r.toFixed(1)} ft</b>`; }
+    el.innerHTML = h; return;
+  }
   if (!gps.fit) h += `<span style="grid-column:1/3;color:var(--target)">Capture at least 2 points (3–4 is better) to turn on the GPS dot.</span>`;
   else {
     for (const c of set) { const r = geoResid(c); if (isFinite(r)) h += `<span>${esc(c.name)}</span><b style="color:${r > 15 ? 'var(--cut)' : 'var(--text)'}">±${r.toFixed(1)} ft</b>`; }
@@ -1076,6 +1184,10 @@ function groundFt(){
 }
 // target: nearest orange target point within 10 ft (auto), otherwise the one the super typed in
 function activeTarget(){
+  if (S.gSurf !== false && surf.d && gps.plan) {
+    const z = surfAtPlan(gps.plan.x, gps.plan.y);
+    if (isNum(z)) return { name: 'Design surface', elev: Math.round(z * 100) / 100, offset: S.gSurfOff || 0, surf: true };
+  }
   if (S.gAuto !== false) {
     const n = gps.plan ? nearestTarget() : null;
     if (n && n.ft <= 10) return { name: n.p.name || 'point', elev: n.p.elev, offset: n.p.offset || 0, auto: true, ft: n.ft };
@@ -1131,7 +1243,7 @@ function renderGrade(force){
     const tgt = t.elev - (t.offset || 0) / 12, d = g - tgt;
     cls = d > S.tol + 1e-9 ? 'cut' : d < -S.tol - 1e-9 ? 'fill' : 'ok';
     big = cls === 'ok' ? 'ON GRADE' : (cls === 'cut' ? 'CUT ' : 'FILL ') + Math.abs(d).toFixed(2) + "'";
-    sub = `${cls === 'ok' ? '' : toInches(d) + ' · '}target dirt ${f2(tgt)}${t.auto ? ` · ${t.name} (${Math.round(t.ft)} ft away)` : ''}`;
+    sub = `${cls === 'ok' ? '' : toInches(d) + ' · '}target dirt ${f2(tgt)}${t.surf ? ' · design surface' : t.auto ? ` · ${t.name} (${Math.round(t.ft)} ft away)` : ''}`;
   }
   $('#gpGround').textContent = isNum(g) ? f2(g) : '—';
   $('#gpTgt').textContent = t ? f2(t.elev) + (t.offset ? ` −${t.offset}"` : '') : '—';
@@ -1232,6 +1344,7 @@ function loadProject(id){
   view.fitted = false;
   img.onload = () => { fit(); renderPins(); };
   img.src = proj.plan;
+  loadSurface();
   geoFit(); autoGps(); updateHeader(); updateHint(); renderPins();
   if ($('#setupView').classList.contains('active')) renderSetup();
 }
