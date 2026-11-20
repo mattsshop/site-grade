@@ -74,6 +74,11 @@
   #gradePanel .gp-big.cut{color:#fca5a5} #gradePanel .gp-big.fill{color:#93c5fd} #gradePanel .gp-big.ok{color:#86efac}
   #gradePanel .gp-sub{text-align:center;font-size:13px;color:var(--muted)}
   #gradePanel .gp-warn{font-size:13px;color:#fde68a;text-align:center;margin-top:4px}
+  #gradePanel .gp-fix{display:flex;justify-content:center;gap:8px;align-items:center;font-size:13px;font-weight:900;letter-spacing:.04em;border-radius:8px;padding:4px 8px;margin-bottom:6px}
+  #gradePanel .gp-fix.rtk{background:#14532d;color:#bbf7d0} #gradePanel .gp-fix.float{background:#7f1d1d;color:#fecaca} #gradePanel .gp-fix.gps,#gradePanel .gp-fix.none{background:#7f1d1d;color:#fecaca}
+  #gradePanel.bad{border-color:#ef4444;box-shadow:0 0 0 2px rgba(239,68,68,.5)}
+  #gradePanel.bad .gp-big{opacity:.45}
+  #gradePanel .gp-btns button:disabled{opacity:.7}
   #gradePanel .gp-btns{display:flex;gap:8px;margin-top:8px}
   #gradePanel .gp-btns button{flex:1;border:0;border-radius:10px;padding:11px 6px;font-weight:800;font-size:15px;background:var(--panel2);color:#fff;border:1px solid var(--line)}
   #gradePanel .gp-btns button.pri{background:var(--accent);color:#111;border-color:var(--accent)}
@@ -360,7 +365,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = '1.5.4';
+const VERSION = '1.5.5';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
@@ -801,14 +806,15 @@ function renderLog(){
   $('#logSummary').textContent = `${S.shots.length} shots · ${cut} cut · ${fill} fill · ${S.shots.length - cut - fill} on grade (±${S.tol.toFixed(2)}')`;
 }
 function csv(){
-  const head = ['Shot', 'Date', 'Time', 'Method', 'Point', 'Plan Elev', 'Offset (in)', 'Target Dirt', 'Laser HI', 'Rod', 'Actual Dirt', 'Cut(+)/Fill(-) ft', 'Result', 'Plan X', 'Plan Y', 'Lat', 'Lon', 'GPS H Acc (ft)'];
+  const head = ['Shot', 'Date', 'Time', 'Method', 'Point', 'Plan Elev', 'Offset (in)', 'Target Dirt', 'Laser HI', 'Rod', 'Actual Dirt', 'Cut(+)/Fill(-) ft', 'Result', 'Plan X', 'Plan Y', 'Lat', 'Lon', 'GPS H Acc (ft)', 'GPS Fix', 'Readings Avg', 'Spread (ft)'];
   const lines = [head.join(',')];
   for (const s of S.shots) {
     const r = shotResult(s), d = new Date(s.time);
     lines.push([s.n, d.toLocaleDateString(), d.toLocaleTimeString(), s.src === 'gps' ? 'GPS' : 'Laser', `"${(s.name || '').replace(/"/g, '""')}"`, f2(s.elev), s.offset || 0,
       f2(r.target), s.src === 'gps' ? '' : f2(r.hi), s.src === 'gps' ? '' : f2(s.rod), f2(r.actual), r.diff.toFixed(3), resultText(r),
       isNum(s.x) ? s.x : '', isNum(s.y) ? s.y : '', isNum(s.lat) ? s.lat.toFixed(8) : '', isNum(s.lon) ? s.lon.toFixed(8) : '',
-      isNum(s.hacc) ? (s.hacc / 0.3048).toFixed(2) : ''].join(','));
+      isNum(s.hacc) ? (s.hacc / 0.3048).toFixed(2) : '', s.src === 'gps' ? ({ rtk: 'Fixed', float: 'Float', gps: 'No RTK' }[s.quality] || '') : '',
+      s.n_avg || '', isNum(s.spread) ? s.spread.toFixed(3) : ''].join(','));
   }
   return lines.join('\n');
 }
@@ -1213,14 +1219,15 @@ function activeTarget(){
 function quality(){
   const f = gps.fix; if (!f) return { lvl: 'none', txt: 'Waiting for GPS…' };
   if (f.acc <= 0.1) return { lvl: 'rtk', txt: '' };
-  if (f.acc <= 0.6) return { lvl: 'float', txt: `GPS ±${(f.acc * FT * 12).toFixed(0)}" – not RTK Fixed, elevations may be off` };
-  return { lvl: 'gps', txt: `GPS ±${(f.acc * FT).toFixed(0)} ft – no RTK fix, don't trust elevations` };
+  if (f.acc <= 0.6) return { lvl: 'float', txt: `FLOAT – wait for RTK Fixed before recording` };
+  return { lvl: 'gps', txt: `No RTK – ±${(f.acc * FT).toFixed(0)} ft, don't trust elevations` };
 }
 let lastGradeDraw = 0, gradeBuilt = false;
 // panel structure is built once; updates only change text so taps on its buttons are never lost
 function buildGrade(){
   const el = $('#gradePanel');
   el.innerHTML = `
+    <div id="gpFix" class="gp-fix none">WAITING FOR GPS</div>
     <div id="gpMsg" class="gp-sub" style="display:none"></div>
     <div id="gpLive">
       <div class="gp-row"><span>Ground</span><b id="gpGround">—</b><span>Target</span><b id="gpTgt">—</b></div>
@@ -1248,10 +1255,16 @@ function renderGrade(force){
   el.style.display = 'block';
   const q = quality(), noAlt = gps.fix && !isNum(gps.fix.alt), cal = !!S.gElev;
   const vis = (id, on) => { $(id).style.display = on ? '' : 'none'; };
+  // v1.5.5: fix-quality badge – green when RTK Fixed, red otherwise
+  const fx = $('#gpFix'), acc = gps.fix ? gps.fix.acc * FT * 12 : NaN;
+  fx.className = 'gp-fix ' + q.lvl;
+  fx.textContent = q.lvl === 'rtk' ? `● RTK FIXED  ±${acc.toFixed(1)}"` : q.lvl === 'float' ? `● FLOAT – WAIT  ±${acc.toFixed(0)}"` : q.lvl === 'gps' ? `● NO RTK  ±${(acc / 12).toFixed(1)} ft` : 'WAITING FOR GPS…';
+  el.classList.toggle('bad', q.lvl !== 'rtk' && cal && !noAlt);
   vis('#gpMsg', noAlt || !cal); vis('#gpLive', !noAlt && cal);
   vis('#gpCal', !noAlt && !cal); vis('#gpTarget', !noAlt && cal); vis('#gpRec', !noAlt && cal);
   $('#gpMsg').textContent = noAlt ? "GPS has no elevation. With an RTK rover, make sure GNSS Master's Mock Location is on." : 'Elevation not calibrated yet';
-  $('#gpWarn').textContent = q.txt ? '⚠ ' + q.txt : ''; vis('#gpWarn', !!q.txt && !noAlt);
+  $('#gpWarn').textContent = q.txt ? '⚠ ' + q.txt : ''; vis('#gpWarn', !!q.txt && !noAlt && q.lvl !== 'none');
+  if (avgShot.active) return;
   if (noAlt || !cal) return;
   const g = groundFt(), t = activeTarget();
   let big = '—', cls = '', sub = 'Set a target grade to see CUT/FILL';
@@ -1267,16 +1280,47 @@ function renderGrade(force){
   $('#gpSub').textContent = sub;
   $('#gpTarget').textContent = t ? 'Change target' : 'Set target';
 }
+// v1.5.5: averaged shot – collect AVG_SEC of GPS readings, save the average and the spread
+const AVG_SEC = 5;
+const avgShot = { active: false, samples: [], timer: null, worst: 'rtk', tick: null };
+const qRank = { rtk: 0, float: 1, gps: 2, none: 3 };
 function recordGpsShot(){
-  const g = groundFt(), t = activeTarget();
-  if (!isNum(g)) return toast('No GPS elevation yet');
-  if (!t) return openSheet({ kind: 'gtarget' });
+  if (avgShot.active) return;
+  if (!isNum(groundFt())) return toast('No GPS elevation yet');
+  if (!activeTarget()) return openSheet({ kind: 'gtarget' });
   const q = quality();
+  if (q.lvl !== 'rtk' && !confirm(`Rover is not RTK Fixed (${q.lvl === 'float' ? 'FLOAT' : 'no RTK'}). Elevations may be off by tenths or more.\n\nRecord anyway?`)) return;
+  avgShot.active = true; avgShot.samples = []; avgShot.worst = q.lvl; avgShot.lastT = null;
+  const btn = $('#gpRec'), t0 = Date.now();
+  btn.disabled = true;
+  const grab = () => {
+    const f = gps.fix;
+    if (f && isNum(f.alt) && f.t !== avgShot.lastT) {
+      avgShot.lastT = f.t;
+      avgShot.samples.push({ alt: f.alt, lat: f.lat, lon: f.lon, acc: f.acc, x: gps.plan?.x, y: gps.plan?.y });
+      const lv = quality().lvl; if (qRank[lv] > qRank[avgShot.worst]) avgShot.worst = lv;
+    }
+    const left = Math.max(0, AVG_SEC - (Date.now() - t0) / 1000);
+    btn.textContent = `Hold still… ${Math.ceil(left)}`;
+    if (left <= 0) finishAvgShot();
+  };
+  grab(); avgShot.tick = setInterval(grab, 200);
+}
+function finishAvgShot(){
+  clearInterval(avgShot.tick); avgShot.active = false;
+  const btn = $('#gpRec'); btn.disabled = false; btn.textContent = 'Record shot';
+  const sm = avgShot.samples, t = activeTarget();
+  if (!sm.length || !S.gElev) { renderGrade(true); return toast('No GPS readings during the shot – try again'); }
+  if (!t) { renderGrade(true); return openSheet({ kind: 'gtarget' }); }
+  const ft = sm.map(a => a.alt * FT + S.gElev.offsetFt), g = avg(ft), spread = Math.max(...ft) - Math.min(...ft);
+  const xs = sm.filter(a => isNum(a.x)), q = avgShot.worst;
   const shot = { n: S.nextShot++, time: Date.now(), src: 'gps', name: t.name || '', elev: t.elev, offset: t.offset || 0,
-    actual: Math.round(g * 1000) / 1000, x: gps.plan ? Math.round(gps.plan.x) : null, y: gps.plan ? Math.round(gps.plan.y) : null,
-    lat: gps.fix.lat, lon: gps.fix.lon, hacc: gps.fix.acc, quality: q.lvl };
-  S.shots.push(shot); save(); renderPins();
-  toast(`Shot #${shot.n} – ${resultText(shotResult(shot))}${q.lvl !== 'rtk' ? ' (not RTK fixed)' : ''}`);
+    actual: Math.round(g * 1000) / 1000, x: xs.length ? Math.round(avg(xs.map(a => a.x))) : null, y: xs.length ? Math.round(avg(xs.map(a => a.y))) : null,
+    lat: avg(sm.map(a => a.lat)), lon: avg(sm.map(a => a.lon)), hacc: avg(sm.map(a => a.acc)), quality: q,
+    n_avg: sm.length, sec_avg: AVG_SEC, spread: Math.round(spread * 1000) / 1000 };
+  S.shots.push(shot); save(); renderPins(); renderGrade(true);
+  const warn = q !== 'rtk' ? ' ⚠ not RTK Fixed' : spread > 0.1 ? ' ⚠ readings varied – check plumb, re-shoot' : '';
+  toast(`Shot #${shot.n} – ${resultText(shotResult(shot))} · avg of ${sm.length} (±${(spread / 2 * 12).toFixed(1)}")${warn}`);
 }
 function renderGElevStatus(){
   const el = $('#gElevStatus'); if (!el) return;
