@@ -1,9 +1,10 @@
 // Site Grade service worker – lets the app open with no cell signal.
 // Bump CACHE when releasing a new version so phones pick up the update.
-const CACHE = 'site-grade-v1.5.5';
+const CACHE = 'site-grade-v1.6.0';
 const SHELL = [
   './',
   './index.html',
+  './cloud.js',
   './projects.json',
   './manifest.json',
   './icon-192.png',
@@ -34,6 +35,13 @@ self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  // v1.6: keep a copy of the Firebase SDK so the app (and cloud sync's offline queue) start with no signal
+  if (url.host === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/')) {
+    e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => {
+      const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return res;
+    })));
+    return;
+  }
   if (url.origin !== location.origin) return;
   const isPlan = url.pathname.includes('/plans/') || url.pathname.includes('/surfaces/');
   if (isPlan) {

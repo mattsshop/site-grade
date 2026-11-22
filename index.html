@@ -145,7 +145,7 @@
 <body>
 <header>
   <div class="title">
-    <h1 id="projName">Site Grade</h1>
+    <h1 id="projName">Site Grade</h1><span id="cloudDot" title="Cloud sync on" style="display:none;margin-left:6px;font-size:14px;vertical-align:middle">☁</span>
     <div class="sub"><span id="projSheet"></span></div>
   </div>
   <div class="hi-badge" id="hiBadge">
@@ -185,6 +185,14 @@
       <div class="card">
         <h2>Project</h2>
         <select id="projSelect"></select>
+      </div>
+
+      <div class="card" id="cloudCard">
+        <h2>Cloud sync</h2>
+        <div class="muted">Sign in to keep shots, target points and GPS control points in sync across your tablet, phone and office PC – and backed up. Works offline; it catches up when you have signal. Calibration and laser setup stay on each device.</div>
+        <div id="cloudStatus" class="resid"></div>
+        <button class="btn" id="cloudIn" style="display:none">Sign in with Google</button>
+        <button class="btn ghost sm" id="cloudOut" style="display:none">Sign out</button>
       </div>
 
       <div class="card">
@@ -365,7 +373,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = '1.5.5';
+const VERSION = '1.6.0';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
@@ -390,7 +398,7 @@ const defaults = p => ({
   nextShot: 1
 });
 const key = () => 'sg:' + proj.id;
-const save = () => store.set(key(), S);
+const save = () => { store.set(key(), S); if (window.cloudOnSave) window.cloudOnSave(); }; // v1.6: cloud sync hook
 
 /* ---------- number helpers ---------- */
 const num = v => { if (v == null) return NaN; const n = parseFloat(String(v).replace(',', '.')); return isFinite(n) ? n : NaN; };
@@ -726,6 +734,7 @@ function confirmLite(){
 
 /* ---------- setup ---------- */
 function renderSetup(){
+  if (window.cloudRender) window.cloudRender();
   renderSurfStatus();
   $('#projSelect').innerHTML = projects.map(p => `<option value="${p.id}" ${p.id === proj.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
   $('#bmName').value = S.bm.name || '';
@@ -857,7 +866,7 @@ $('#sharePlan').onclick = () => {
 $('#clearLog').onclick = function(){
   if (this.dataset.armed && Date.now() - this.dataset.armed < 3000) {
     S.shots = []; S.nextShot = 1; save(); renderPins(); renderLog(); this.textContent = 'Clear all shots'; delete this.dataset.armed; toast('Shots cleared');
-  } else { this.dataset.armed = Date.now(); this.textContent = 'Tap again to clear all shots'; setTimeout(() => { this.textContent = 'Clear all shots'; }, 3000); }
+  } else { this.dataset.armed = Date.now(); this.textContent = window.cloud?.user ? 'Tap again – clears for EVERY synced device' : 'Tap again to clear all shots'; setTimeout(() => { this.textContent = 'Clear all shots'; }, 3000); }
 };
 
 
@@ -1407,6 +1416,7 @@ function loadProject(id){
   loadSurface(); applySpots();
   geoFit(); autoGps(); updateHeader(); updateHint(); renderPins();
   if ($('#setupView').classList.contains('active')) renderSetup();
+  if (window.cloudOnProject) window.cloudOnProject();
 }
 
 $('#verLbl').textContent = 'Site Grade v' + VERSION;
@@ -1421,5 +1431,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 </script>
+<script type="module" src="cloud.js"></script>
 </body>
 </html>

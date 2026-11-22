@@ -3,7 +3,7 @@
 Mobile web app for checking dirt grades with a rotating laser and a grade rod.
 Hosted on GitHub Pages; works offline after the first load.
 
-**Current version: v1.5.5** – GPS shots are averaged over 5 s (spread shown + in CSV); red FLOAT/NO RTK badge and a warning before recording a non-Fixed shot. Previous (v1.5.4): – "Home test (yard)" project: Google Earth image + USGS 1 m lidar ground surface (2018), benchmark = lidar at corner 1 pin; – ◉ button on the plan shows/hides the orange spot points
+**Current version: v1.6.0** – Cloud sync (Firebase project `site-grade`): sign in with Google in Setup → Cloud sync; shots, target points and GPS control points sync per project across devices (offline-first, localStorage stays the working copy; calibration/laser/settings stay per device). Rules in `firestore.rules`. Previous (v1.5.5): – GPS shots are averaged over 5 s (spread shown + in CSV); red FLOAT/NO RTK badge and a warning before recording a non-Fixed shot. Previous (v1.5.4): – "Home test (yard)" project: Google Earth image + USGS 1 m lidar ground surface (2018), benchmark = lidar at corner 1 pin; – ◉ button on the plan shows/hides the orange spot points
 
 ## How it works
 1. **Setup** – shoot the benchmark (e.g. slab F.F.E.). App computes laser HI = BM elevation + rod reading.

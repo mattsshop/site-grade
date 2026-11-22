@@ -1,0 +1,18 @@
+rules_version = '2';
+// Site Grade – Firestore security rules (paste into Firebase console → Firestore Database → Rules → Publish)
+// Only the people listed here (or anyone with a company Google Workspace account) can read/write synced data.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function allowed() {
+      return request.auth != null && (
+        request.auth.token.email in [
+          'YOUR-GOOGLE-EMAIL@gmail.com'          // ← put Matt's Google sign-in email here; add supers the same way
+        ]
+        || request.auth.token.email.matches('.*@perimeterconstructiongroup[.]com$')
+      );
+    }
+    match /projects/{projectId}/{document=**} {
+      allow read, write: if allowed();
+    }
+  }
+}
