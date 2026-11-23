@@ -187,6 +187,12 @@
         <select id="projSelect"></select>
       </div>
 
+      <div class="card">
+        <h2>Survey / As-built</h2>
+        <div class="muted">No plan yet? Shoot coded RTK points (curbs, pavement, ground, manholes) on a satellite map, then export to Civil 3D, AutoCAD or Google Earth.</div>
+        <a class="btn" href="survey.html" style="text-align:center;text-decoration:none">Open Survey mode</a>
+      </div>
+
       <div class="card" id="cloudCard">
         <h2>Cloud sync</h2>
         <div class="muted">Sign in to keep shots, target points and GPS control points in sync across your tablet, phone and office PC – and backed up. Works offline; it catches up when you have signal. Calibration and laser setup stay on each device.</div>
@@ -373,7 +379,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const VERSION = '1.6.0';
+const VERSION = '1.7.0';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 

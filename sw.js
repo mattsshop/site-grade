@@ -1,10 +1,13 @@
 // Site Grade service worker – lets the app open with no cell signal.
 // Bump CACHE when releasing a new version so phones pick up the update.
-const CACHE = 'site-grade-v1.6.0';
+const CACHE = 'site-grade-v1.7.0';
+const TILES = 'sg-tiles'; // v1.7: map tiles you've viewed, kept across versions for offline use
 const SHELL = [
   './',
   './index.html',
   './cloud.js',
+  './survey.html',
+  './survey.js',
   './projects.json',
   './manifest.json',
   './icon-192.png',
@@ -24,7 +27,7 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== TILES).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -40,6 +43,21 @@ self.addEventListener('fetch', e => {
     e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => {
       const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return res;
     })));
+    return;
+  }
+  // v1.7: Leaflet map library – keep a copy
+  if (url.host === 'unpkg.com' && url.pathname.startsWith('/leaflet@')) {
+    e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(res => {
+      const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy)); return res;
+    })));
+    return;
+  }
+  // v1.7: map tiles (USGS imagery, OpenStreetMap) – network first, fall back to tiles seen before
+  if (url.host === 'basemap.nationalmap.gov' || url.host === 'tile.openstreetmap.org') {
+    e.respondWith(fetch(req).then(res => {
+      if (res.ok || res.type === 'opaque') { const copy = res.clone(); caches.open(TILES).then(c => c.put(req, copy)); }
+      return res;
+    }).catch(() => caches.match(req)));
     return;
   }
   if (url.origin !== location.origin) return;

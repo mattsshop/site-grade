@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#1b242e">
+<link rel="manifest" href="manifest.json">
+<title>Site Grade – Survey / As-built</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{
+    --bg:#11181f; --panel:#1b242e; --panel2:#243040; --line:#334155;
+    --text:#e8edf2; --muted:#94a3b8; --accent:#f6c343;
+    --cut:#ef4444; --fill:#3b82f6; --ok:#22c55e; --target:#f59e0b;
+    --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font:16px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;overscroll-behavior:none}
+  body{display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+  header{padding:calc(8px + var(--safe-t)) 12px 8px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+  header .title{flex:1;min-width:0}
+  header h1{font-size:16px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  header .sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hbtn{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px;padding:8px 12px;font-size:15px;font-weight:700}
+  main{flex:1;position:relative}
+  #map{position:absolute;inset:0;background:#0d141b}
+  .leaflet-container{font:inherit}
+  .tools{position:absolute;right:10px;top:10px;z-index:500;display:flex;flex-direction:column;gap:8px}
+  .fab{width:46px;height:46px;border-radius:12px;border:1px solid var(--line);background:rgba(27,36,46,.92);color:var(--text);font-size:20px;font-weight:800}
+  .fab.on{background:var(--accent);color:#111}
+  .fab small{font-size:11px;display:block;font-weight:700}
+  /* bottom panel */
+  #panel{background:var(--panel);border-top:1px solid var(--line);padding:8px 10px calc(10px + var(--safe-b))}
+  .fix{display:flex;justify-content:center;gap:8px;align-items:center;font-size:13px;font-weight:900;letter-spacing:.04em;border-radius:8px;padding:4px 8px}
+  .fix.rtk{background:#14532d;color:#bbf7d0}.fix.float,.fix.gps{background:#7f1d1d;color:#fecaca}.fix.none{background:var(--panel2);color:var(--muted)}
+  .elev{display:flex;justify-content:space-between;align-items:baseline;margin:6px 2px}
+  .elev b{font-size:26px;color:var(--accent)} .elev span{font-size:12px;color:var(--muted)}
+  .codes{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px;scrollbar-width:none}
+  .codes::-webkit-scrollbar{display:none}
+  .code{flex:0 0 auto;border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:9px 11px;border-radius:10px;font-size:15px;font-weight:800}
+  .code.on{background:var(--accent);color:#111;border-color:var(--accent)}
+  .row{display:flex;gap:8px}.row>*{flex:1}
+  .btn{display:block;width:100%;border:0;border-radius:12px;padding:14px;font-size:17px;font-weight:800;background:var(--accent);color:#111}
+  .btn:disabled{opacity:.7}
+  .btn.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+  .btn.danger{background:#7f1d1d;color:#fff}
+  .btn.sm{padding:10px;font-size:15px}
+  .mt{margin-top:10px}
+  label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+  input,select,textarea{width:100%;font-size:18px;padding:11px;border-radius:10px;border:1px solid var(--line);background:#0d141b;color:var(--text)}
+  .muted{color:var(--muted);font-size:13px}
+  /* sheets */
+  .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:1000}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:1001;background:var(--panel);border-radius:18px 18px 0 0;max-height:90dvh;overflow:auto;
+    padding:8px 14px calc(16px + var(--safe-b));transform:translateY(105%);transition:transform .2s ease;border-top:1px solid var(--line);max-width:640px;margin:0 auto}
+  .sheet.open{transform:none}
+  .sheet .grab{width:44px;height:5px;border-radius:3px;background:var(--line);margin:4px auto 8px}
+  .sheet h3{margin:0 0 6px;font-size:17px}
+  .list{margin-top:8px}
+  .item{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:10px;margin-top:6px;background:var(--panel2)}
+  .item .t{flex:1;min-width:0}.item .t b{display:block}.item .t span{font-size:12px;color:var(--muted)}
+  .item.cur{border-color:var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+  td,th{padding:7px 4px;border-bottom:1px solid var(--line);text-align:left}
+  th{color:var(--muted);font-weight:600;font-size:12px}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px;margin-top:6px}
+  .kv span{color:var(--muted)}
+  #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(200px + var(--safe-b));z-index:2000;background:#0d141b;border:1px solid var(--line);
+    padding:10px 14px;border-radius:12px;font-size:14px;display:none;max-width:92vw;text-align:center}
+  #measure{position:absolute;left:10px;top:10px;z-index:500;background:rgba(13,20,27,.92);border:1px solid var(--accent);border-radius:12px;padding:8px 12px;font-size:14px;display:none;max-width:70%}
+  .pt-lbl{background:rgba(13,20,27,.85);color:#fff;border:0;box-shadow:none;font-size:11px;font-weight:700;padding:1px 4px;border-radius:4px}
+  .pt-lbl::before{display:none}
+  .far .pt-lbl{display:none}
+  .me{width:18px;height:18px;border-radius:50%;background:#3b82f6;border:3px solid #fff;box-shadow:0 0 0 2px rgba(59,130,246,.5)}
+</style>
+</head>
+<body>
+<header>
+  <div class="title">
+    <h1 id="siteName">Survey / As-built</h1>
+    <div class="sub" id="siteSub">Pick or create a site</div>
+  </div>
+  <button class="hbtn" id="sitesBtn">Sites</button>
+  <button class="hbtn" id="menuBtn">⋯</button>
+</header>
+<main>
+  <div id="map"></div>
+  <div id="measure"></div>
+  <div class="tools">
+    <button class="fab on" id="followBtn" title="Follow my position">◎</button>
+    <button class="fab" id="layerBtn" title="Map layer"><small>MAP</small>SAT</button>
+    <button class="fab" id="measBtn" title="Measure between two points">📏</button>
+    <button class="fab" id="fitBtn" title="Zoom to points">⤢</button>
+  </div>
+</main>
+<div id="panel">
+  <div class="fix none" id="fixBadge">WAITING FOR GPS…</div>
+  <div class="elev"><div><span>Elevation </span><b id="elevVal">—</b></div><span id="elevNote">not calibrated</span></div>
+  <div class="codes" id="codes"></div>
+  <div class="row">
+    <button class="btn ghost sm" id="lineBtn" style="flex:0 0 34%">New line</button>
+    <button class="btn" id="shootBtn">Shoot point</button>
+  </div>
+</div>
+
+<div class="sheet-bg" id="bg"></div>
+
+<!-- sites -->
+<div class="sheet" id="sitesSheet"><div class="grab"></div>
+  <h3>Sites</h3>
+  <div class="muted">A site is a job with no plan yet – shoot points, then look at them on your computer.</div>
+  <div class="list" id="siteList"></div>
+  <label>New site name</label>
+  <input id="newName" type="text" placeholder="e.g. Hwy 92 lot – existing">
+  <label>State plane zone (for exports)</label>
+  <select id="newZone"><option value="W">Georgia West (Cobb, Douglas, Paulding, Bartow, Fulton…)</option><option value="E">Georgia East (Gwinnett, DeKalb…)</option></select>
+  <button class="btn mt" id="createSite">Create site</button>
+</div>
+
+<!-- menu -->
+<div class="sheet" id="menuSheet"><div class="grab"></div>
+  <h3>Menu</h3>
+  <button class="btn ghost sm mt" id="calOpen">Set elevation (benchmark)</button>
+  <button class="btn ghost sm mt" id="listOpen">Point list</button>
+  <button class="btn ghost sm mt" id="expOpen">Export (Civil 3D / Google Earth / AutoCAD)</button>
+  <div class="mt" id="cloudBox" style="border:1px solid var(--line);border-radius:12px;padding:10px">
+    <b>Cloud sync</b><div class="muted" id="cloudMsg">Starting…</div>
+    <button class="btn sm mt" id="cloudIn" style="display:none">Sign in with Google</button>
+  </div>
+  <button class="btn ghost sm mt" id="delSite">Delete this site</button>
+  <a href="./" class="btn ghost sm mt" style="text-align:center;text-decoration:none">← Back to Site Grade</a>
+  <div class="muted mt" id="verLbl"></div>
+</div>
+
+<!-- calibrate -->
+<div class="sheet" id="calSheet"><div class="grab"></div>
+  <h3>Set elevation</h3>
+  <div class="muted">Stand the rod on something permanent (manhole rim, nail, slab corner). Enter its known elevation – or keep 100.00 for an assumed benchmark. Everything you shoot will be relative to it.</div>
+  <label>Benchmark name</label><input id="bmName" type="text" value="BM-1">
+  <label>Benchmark elevation (ft)</label><input id="bmElev" type="text" inputmode="decimal" value="100.00">
+  <div class="kv" id="calInfo"></div>
+  <button class="btn mt" id="calStart">Hold rod on BM – start 5 s</button>
+  <button class="btn ghost sm mt" id="calClear">Clear calibration (use raw GPS height)</button>
+</div>
+
+<!-- point -->
+<div class="sheet" id="ptSheet"><div class="grab"></div>
+  <h3 id="ptTitle">Point</h3>
+  <div class="kv" id="ptInfo"></div>
+  <label>Code</label><select id="ptCode"></select>
+  <label>Note</label><input id="ptNote" type="text" placeholder="optional">
+  <div class="row mt"><button class="btn ghost sm" id="ptDel">Delete</button><button class="btn sm" id="ptSave">Save</button></div>
+</div>
+
+<!-- list -->
+<div class="sheet" id="listSheet"><div class="grab"></div>
+  <h3>Points</h3>
+  <div class="muted" id="listSum"></div>
+  <table><thead><tr><th>#</th><th>Code</th><th>Elev</th><th>Fix</th><th>Note</th></tr></thead><tbody id="listBody"></tbody></table>
+</div>
+
+<!-- export -->
+<div class="sheet" id="expSheet"><div class="grab"></div>
+  <h3>Export</h3>
+  <div class="muted" id="expInfo"></div>
+  <button class="btn mt" id="expPnezd">Civil 3D points – CSV (P,N,E,Z,D)</button>
+  <button class="btn ghost mt" id="expDxf">AutoCAD – DXF (points, labels, lines)</button>
+  <button class="btn ghost mt" id="expKml">Google Earth – KML</button>
+  <button class="btn ghost mt" id="expCsv">Full detail – CSV (lat/long, accuracy, fix…)</button>
+</div>
+
+<div id="toast"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="module" src="survey.js"></script>
+</body>
+</html>

@@ -14,5 +14,9 @@ service cloud.firestore {
     match /projects/{projectId}/{document=**} {
       allow read, write: if allowed();
     }
+    // v1.7: Survey / As-built sites
+    match /sites/{siteId}/{document=**} {
+      allow read, write: if allowed();
+    }
   }
 }
