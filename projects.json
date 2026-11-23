@@ -57,7 +57,8 @@
         "py": 1566.5,
         "rot": -38.05
       },
-      "surface": "surfaces/home2-fg.json"
+      "surface": "surfaces/home2-fg.json",
+      "cad": "plans/home2-douglasville-cad.png"
     },
     {
       "id": "woodspring-douglasville",
@@ -637,7 +638,8 @@
         "py": 1304.7,
         "rot": -60.097
       },
-      "surface": "surfaces/woodspring-fg.json"
+      "surface": "surfaces/woodspring-fg.json",
+      "cad": "plans/woodspring-douglasville-cad.png"
     },
     {
       "id": "home-test",

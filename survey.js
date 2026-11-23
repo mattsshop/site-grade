@@ -1,7 +1,7 @@
 // Site Grade – Survey / As-built mode (v1.7.0)
 // Shoot coded RTK points on a site with no plan, see them on USGS imagery, sync with Firebase,
 // export to Civil 3D (PNEZD), AutoCAD (DXF) and Google Earth (KML).
-const VERSION = '1.7.0';
+const VERSION = '1.7.1';
 const $ = s => document.querySelector(s);
 const FT = 3.28083989501;
 const isNum = v => typeof v === 'number' && isFinite(v);

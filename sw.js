@@ -1,6 +1,6 @@
 // Site Grade service worker – lets the app open with no cell signal.
 // Bump CACHE when releasing a new version so phones pick up the update.
-const CACHE = 'site-grade-v1.7.0';
+const CACHE = 'site-grade-v1.7.1';
 const TILES = 'sg-tiles'; // v1.7: map tiles you've viewed, kept across versions for offline use
 const SHELL = [
   './',
